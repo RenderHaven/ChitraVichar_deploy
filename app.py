@@ -24,7 +24,7 @@ CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "
 
 
 # Configure the database connection string from environment variables, fallback to SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL','sqlite:///app.db')  #"postgresql://chitravihar_database_user:5L8PZ52f1fSrYREgBbpoah0W9619KoK9@dpg-cugt3i1u0jms73fqq2v0-a.singapore-postgres.render.com/chitravihar_database"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL','postgresql://chitravihar_database_user:5L8PZ52f1fSrYREgBbpoah0W9619KoK9@dpg-cugt3i1u0jms73fqq2v0-a.singapore-postgres.render.com/chitravihar_database')  #"postgresql://chitravihar_database_user:5L8PZ52f1fSrYREgBbpoah0W9619KoK9@dpg-cugt3i1u0jms73fqq2v0-a.singapore-postgres.render.com/chitravihar_database"   "sqlite:///app.db"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the app with SQLAlchemy
@@ -51,4 +51,4 @@ if __name__ == '__main__':
         db.create_all() 
         migrate.init_app(app, db)
     # Running the app with debug mod
-    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 10000)))
+    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 10000)),debug=True)

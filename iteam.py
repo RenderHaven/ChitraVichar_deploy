@@ -25,7 +25,6 @@ def add_item():
         price = data.get('price')
         description_content = data.get('description', None)
         quantity_in_stock = data.get('stock_quantity')
-        base64_image = data.get('display_img', None)
         variation_value_ids = data.get('variation_value_ids', [])
         disc_id = data.get('disc_id',None)
         tag_name = data.get('tag_name', ' ')  # Tagname
@@ -70,15 +69,17 @@ def add_item():
             else:
                 return jsonify({"error": "Description not found for the provided disc_id"}), 404
         else:
+            print("gus aaya")
             # Add a new description with tagline and content
             if description_content and tag_name and description_content!='':
-                print("gus aaya")
                 new_description = Description(
                     content=description_content,
                     tag_name=tag_name
                 )
+                db.session.add(new_description)
                 db.session.commit()
                 new_item.disc_id=new_description.id
+                print(new_description.id)
                 db.session.commit()
         print("sucsess")
         return jsonify({
@@ -199,18 +200,6 @@ def get_item_by_id(item_id, all='false'):
         item = ProductItem.query.filter_by(i_id=item_id).first()
         if not item:
             return jsonify({"error": "Item not found"}), 404
-
-        variations = []
-        # if all.lower() == 'true':
-        #     for variation_config in item.variations:
-        #         var_option = VariationOption.query.filter_by(id=variation_config.variation_option_id).first()
-        #         if(var_option==None):continue
-        #         var = Variation.query.filter_by(id=var_option.variation_id).first()
-        #         variations.append({
-        #             'name': var.name,
-        #             'value': var_option.value,
-        #             'option_id': var_option.id
-        #         })
 
         item_data=item.to_dict()
 

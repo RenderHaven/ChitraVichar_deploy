@@ -30,9 +30,8 @@ def add_product():
         product_name = data.get('name')  # Product name
         description_content = data.get('description', '')  # Optional product description
         tag_name = data.get('tag_name', ' ')  # Tagname
-        base64_image = data.get('display_img')
-        offer = data.get('discount')
         typ = data.get('type')
+        discount=data.get('discount')
         disc_id = data.get('disc_id')  # Description ID
 
         if not pc_id or not product_name:
@@ -42,19 +41,7 @@ def add_product():
         parent_category = Category.query.get(pc_id)
         if not parent_category:
             return jsonify({"error": "Parent category not found"}), 404
-
-        # Handle base64 image upload to Cloudinary
-        image_url = None
-        # if base64_image:
-        #     try:
-        #         # Decode base64 image and upload to Cloudinary
-        #         file_to_upload = base64.b64decode(base64_image)
-        #         upload_result = cloudinary.uploader.upload(file_to_upload)
-        #         image_url = upload_result.get('secure_url')
-        #     except Exception as e:
-        #         return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
-
-        # Create a new category for the product
+        
         new_category = Category(
             c_id=str(uuid.uuid4()),
             pc_id=pc_id,
@@ -68,8 +55,7 @@ def add_product():
             name=product_name,
             c_id=new_category.c_id,
             disc_id=disc_id,  # Use the provided description ID if available
-            image_url=image_url,
-            discount=offer,
+            discount=discount,
             Type=typ
         )
         db.session.add(new_product)
@@ -274,7 +260,7 @@ def search_products():
     else:
         products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
 
-    result = [{"p_id": p.p_id, "name": p.name, 'c_id':p.c_id,"description": p.description.content if p.description else None} for p in products]
+    result = [p.to_small_dict() for p in products]
     return jsonify(result), 200
 
 

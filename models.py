@@ -65,8 +65,17 @@ class Product(db.Model):
             "image_url": self.image_url,
             "Type": self.Type,
             "discount": self.discount,
-            # "category": self.category.to_dict() if self.category else None,
             "items_id": [item.i_id for item in self.product_items],
+        }
+    def to_small(self):
+        return {
+            "p_id": self.p_id,
+            "c_id" :self.c_id,
+            "name": self.name,
+            "description": self.description.content if self.description else None,  # Use the Description relation
+            "tag_name": self.description.tag_name if self.description else None,
+            "Type": self.Type,
+            "discount": self.discount,
         }
 
 
@@ -79,53 +88,61 @@ class ProductItem(db.Model):
     price = db.Column(db.Float, nullable=False, default=0.0)
     disc_id = db.Column(db.String(36), ForeignKey('descriptions.id'), nullable=True)  # Reference to Description
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
-    
+
     description = relationship("Description", backref="product_items")  # Relationship with Description table
     products = relationship('Product', secondary='product_to_items', back_populates="product_items")
     variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan")
-    orders = db.relationship('Order', backref='item', lazy=True) 
+    orders = db.relationship('Order', backref='item', lazy=True)
     carts = db.relationship('Cart', backref='item', lazy=True)
+
+    def _get_max_discount(self):
+        """ Helper function to calculate the maximum discount from variations and products """
+        max_discount = 0.0
+
+        for variation in self.variations:
+            option = variation.variation_option
+            if option:
+                variation_dict = option.to_dict()
+                if variation_dict.get('variation_name') == "Discount":
+                    value = variation_dict.get('value', '')
+                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
+                        max_discount = max(max_discount, float(value))
+
+        for product in self.products:
+            if product.Type == 'Discount' and isinstance(product.discount, (int, float)):
+                max_discount = max(max_discount, float(product.discount))
+        print("cddc")
+        return max_discount
+        
     def to_dict(self):
-        # Fetch all variation options
-        variations = [
-            variation.variation_option.to_dict() 
-            for variation in self.variations 
-            if variation.variation_option
-        ]
-        
-        # Extract discount values where variation_name is 'Discount'
-        discount_values = [
-            float(discount['value'])
-            for discount in variations
-            if discount.get('variation_name') == "Discount" and discount.get('value', '').replace('.', '', 1).isdigit()
-        ]
-        
-        # Get the max discount or default to 0.0
-        max_discount = max(discount_values, default=0.0)
-        
+        max_discount = self._get_max_discount()
+
         return {
             "i_id": self.i_id,
             "name": self.name,
             "image_url": self.image_url,
             "price": self.price,
-            "description": self.description.content if self.description else None,  # Use the Description relation
+            "description": self.description.content if self.description else None,
             "tag_name": self.description.tag_name if self.description else None,
-            'disc_id': self.description.id if self.description else None,
+            "disc_id": self.description.id if self.description else None,
             "stock_quantity": self.stock_quantity,
             "products_id": [product.p_id for product in self.products],
-            "images": [image.to_dict() for image in self.images],  # Include associated images
-            'products':[{'name':product.name,'p_id':product.p_id} for product in self.products],
-            "variations": variations,  # Include all variations
-            'discount': max_discount,  # Max discount value
+            "images": [image.to_dict() for image in self.images],
+            "products": [{'name': product.name, 'p_id': product.p_id} for product in self.products],
+            "variations": [variation.variation_option.to_dict() for variation in self.variations if variation.variation_option],
+            "discount": max_discount,
         }
+
     def to_small_dict(self):
+        max_discount = self._get_max_discount()
+
         return {
             "i_id": self.i_id,
             "name": self.name,
             "image_url": self.image_url,
             "price": self.price,
             "variations": [variation.variation_option.to_dict() for variation in self.variations if variation.variation_option],
-            "discount":10,
+            "discount": max_discount,
         }
 
 
