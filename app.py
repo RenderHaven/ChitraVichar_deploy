@@ -51,4 +51,4 @@ if __name__ == '__main__':
         db.create_all() 
         migrate.init_app(app, db)
     # Running the app with debug mod
-    app.run(host='0.0.0.0', debug=True,port=8080)
+    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 10000)))
