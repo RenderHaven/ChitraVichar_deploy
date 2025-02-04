@@ -1,5 +1,6 @@
 from models import db, Product, Category,Variation,VariationOption,User
 from app import app
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Sample product data
 product_data = {
@@ -111,7 +112,8 @@ def insert_data():
         email='vikrambalai1002@gmail.com',
         last_name='Balai',
         gender='Male',
-        image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcyI9Cvp53aaP9XeRn-ZKbJDH2QaWC72O26A&s'
+        image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcyI9Cvp53aaP9XeRn-ZKbJDH2QaWC72O26A&s',
+        password=generate_password_hash('1234567890', method='pbkdf2:sha256')
     )
     db.session.add(user)
     db.session.commit()

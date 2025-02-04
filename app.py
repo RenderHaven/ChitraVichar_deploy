@@ -24,7 +24,7 @@ CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "
 
 
 # Configure the database connection string from environment variables, fallback to SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL','sqlite:///app.db')  #"postgresql://postgres:vikramisdevloper@database-1.c34momewg4x8.ap-south-1.rds.amazonaws.com:5432/postgres"
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL','sqlite:///app.db')  #"postgresql://chitravihar_database_user:5L8PZ52f1fSrYREgBbpoah0W9619KoK9@dpg-cugt3i1u0jms73fqq2v0-a.singapore-postgres.render.com/chitravihar_database"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the app with SQLAlchemy

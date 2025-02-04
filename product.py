@@ -274,7 +274,7 @@ def search_products():
     else:
         products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
 
-    result = [{"p_id": p.p_id, "name": p.name, "description": p.description.content if p.description else None} for p in products]
+    result = [{"p_id": p.p_id, "name": p.name, 'c_id':p.c_id,"description": p.description.content if p.description else None} for p in products]
     return jsonify(result), 200
 
 
@@ -415,14 +415,15 @@ def item_from_product(product_id):
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):
     try:
+        
         # Find the product by its ID
         product = Product.query.get(product_id)
-        if not product:
+        if(product_id in ('Home','Pro','New')):
+            return jsonify({"message": "Products are imutable"}), 200
+        if not product :
             return jsonify({"error": "Product not found"}), 404
-
         # Get the category ID of the product
         category_id = product.c_id
-
         # Fetch all subcategories recursively
         def get_subcategories(category_id):
             subcategories = Category.query.filter_by(pc_id=category_id).all()

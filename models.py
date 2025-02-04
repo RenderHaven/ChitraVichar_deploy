@@ -114,6 +114,7 @@ class ProductItem(db.Model):
             "stock_quantity": self.stock_quantity,
             "products_id": [product.p_id for product in self.products],
             "images": [image.to_dict() for image in self.images],  # Include associated images
+            'products':[{'name':product.name,'p_id':product.p_id} for product in self.products],
             "variations": variations,  # Include all variations
             'discount': max_discount,  # Max discount value
         }
@@ -160,7 +161,7 @@ class VariationOption(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     variation_id = db.Column(db.String(36), ForeignKey('variations.id'), nullable=False)
     value = db.Column(db.String(200), nullable=False)
-
+    disc = db.Column(db.String(300), nullable=True)  
     variation = relationship("Variation", back_populates="options")
     product_items = relationship("ProductItemVariation", back_populates="variation_option" ,cascade="all, delete-orphan")
 
@@ -170,6 +171,7 @@ class VariationOption(db.Model):
             "variation_id": self.variation_id,
             "value": self.value,
             "variation_name": self.variation.name if self.variation else None,
+            'disc':self.disc,
         }
 
 

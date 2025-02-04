@@ -30,14 +30,15 @@ def add_variation():
         print("Variation added:", variation.id)
 
         # Add options (values) to the variation
+        i=0
         for option_value in data['options']:
-            option = VariationOption(value=option_value, variation_id=variation.id)
+            option = VariationOption(value=option_value, variation_id=variation.id,disc=data['discs'][i] if len(data['discs'])>i else None)
             db.session.add(option)
-
+            i+=1
         db.session.commit()
         
         # Return success response
-        return jsonify({"message": "Variation added successfully", "variation_id": variation.id}), 201
+        return jsonify({"message": "Variation added successfully", "name": variation.name}), 201
 
     except IntegrityError as e:
         db.session.rollback()
@@ -202,7 +203,8 @@ def edit_variation(variation_id):
             for option in new_options:
                 option_value = option.get('value')
                 option_id = option.get('id')
-
+                option_disc=option.get('disc')
+                print(option)
                 if not option_value:
                     return jsonify({"error": "Option value is required"}), 400
 
@@ -211,9 +213,10 @@ def edit_variation(variation_id):
                 if existing_option and existing_option.variation_id == variation_id:
                     # Update the existing option
                     existing_option.value = option_value
+                    existing_option.disc=option_disc
                 else:
                     # Add a new option if no existing option matches the option_id
-                    new_option = VariationOption(value=option_value, variation_id=variation_id)
+                    new_option = VariationOption(value=option_value, variation_id=variation_id,disc=option_disc)
                     db.session.add(new_option)
 
             db.session.commit()
@@ -221,6 +224,7 @@ def edit_variation(variation_id):
         return jsonify({"message": "Variation updated successfully"}), 200
 
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
 
