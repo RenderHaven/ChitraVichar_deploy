@@ -45,14 +45,14 @@ def add_product():
 
         # Handle base64 image upload to Cloudinary
         image_url = None
-        if base64_image:
-            try:
-                # Decode base64 image and upload to Cloudinary
-                file_to_upload = base64.b64decode(base64_image)
-                upload_result = cloudinary.uploader.upload(file_to_upload)
-                image_url = upload_result.get('secure_url')
-            except Exception as e:
-                return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
+        # if base64_image:
+        #     try:
+        #         # Decode base64 image and upload to Cloudinary
+        #         file_to_upload = base64.b64decode(base64_image)
+        #         upload_result = cloudinary.uploader.upload(file_to_upload)
+        #         image_url = upload_result.get('secure_url')
+        #     except Exception as e:
+        #         return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
 
         # Create a new category for the product
         new_category = Category(
@@ -96,6 +96,43 @@ def add_product():
             "product_id": new_product.p_id,
             "category_id": new_category.c_id
         }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({"error": str(e)}), 500
+    
+@product_bp.route('/upload_product_image', methods=['POST'])
+def upload_product_image():
+    """
+    Uploads an image for an existing product and updates its image_url.
+    """
+    try:
+        data = request.json
+        product_id = data.get('product_id')
+        base64_image = data.get('display_img')
+
+        if not product_id or not base64_image:
+            return jsonify({"error": "product_id and image are required"}), 400
+
+        # Find the product
+        product = Product.query.get(product_id)
+        if not product:
+            return jsonify({"error": "Product not found"}), 404
+
+        # Upload image to Cloudinary
+        try:
+            file_to_upload = base64.b64decode(base64_image)
+            upload_result = cloudinary.uploader.upload(file_to_upload)
+            image_url = upload_result.get('secure_url')
+        except Exception as e:
+            return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
+
+        # Update product image_url
+        product.image_url = image_url
+        db.session.commit()
+
+        return jsonify({"message": "Image uploaded successfully", "image_url": image_url}), 200
 
     except Exception as e:
         db.session.rollback()
@@ -194,6 +231,7 @@ def get_products_by_category(category_id):
 
     except Exception as e:
         db.session.rollback()
+        print(e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -206,21 +244,21 @@ def get_items_by_product_id(product_id):
             return jsonify({"error": "Product not found"}), 404
 
         # Fetch the related product items via the relationship
-        product_items = ProductItem.query.join(ProToItem, ProToItem.i_id == ProductItem.i_id)\
-            .filter(ProToItem.p_id == product_id).all()
+        product_to_items = ProToItem.query.filter_by(p_id=product_id).all()
 
         # Serialize the data
-        items_data = [
-            item.i_id for item in product_items
+        items_ids = [
+            item.i_id for item in product_to_items
         ]
 
         return jsonify({
             "product_id": product.p_id,
             "product_name": product.name,
-            "item_ids": items_data
+            "item_ids":items_ids,
         }), 200
 
     except Exception as e:
+        print(e)
         return jsonify({"error": str(e)}), 500
 
 
@@ -236,7 +274,7 @@ def search_products():
     else:
         products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
 
-    result = [{"id": p.p_id, "name": p.name, "description": p.description.content if p.description else None} for p in products]
+    result = [{"p_id": p.p_id, "name": p.name, "description": p.description.content if p.description else None} for p in products]
     return jsonify(result), 200
 
 
@@ -283,7 +321,6 @@ def get_products_by_gender():
                 Product.Type == 'Man',
                 Product.Type == 'Women',
                 Product.Type == 'UniSex',
-                Product.Type == 'Other'
             )
         ).all()
 
@@ -360,13 +397,13 @@ def item_from_product(product_id):
 
         # Prepare the response
         items_data = [
-            item.to_dict()
+            item.to_small_dict()
             for item in all_product_items
         ]
         item_ids=[item.i_id for item in all_product_items]
         return jsonify({
             "item_ids": item_ids,
-            "item_data" : items_data
+            "items_data" : items_data
         }), 200
 
     except Exception as e:

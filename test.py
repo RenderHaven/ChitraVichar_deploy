@@ -61,11 +61,11 @@ variation_data = {
     },
     "Cat2": {
         "name": "Size",
-        "options":['S']
+        "options":['S','L','M','XL']
     },
     "Cat3": {
         "name": "Color",
-        "options":['M']
+        "options":['Black','Red','Blue']
     },
 }
 
@@ -108,7 +108,10 @@ def insert_data():
         id='User1',
         name='Vikram',
         number='+919461373630',
-        email='vikrambalai1002@gmail.com'
+        email='vikrambalai1002@gmail.com',
+        last_name='Balai',
+        gender='Male',
+        image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcyI9Cvp53aaP9XeRn-ZKbJDH2QaWC72O26A&s'
     )
     db.session.add(user)
     db.session.commit()

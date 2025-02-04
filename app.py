@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template,jsonify
 from flask_cors import CORS
 from models import db, Category, Product
 from users import user_bp
@@ -24,7 +24,7 @@ CORS(app, resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "PUT", "
 
 
 # Configure the database connection string from environment variables, fallback to SQLite
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', "postgresql://postgres:vikramisdevloper@database-1.cv4mksa0gyui.eu-north-1.rds.amazonaws.com:5432/postgres")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL','sqlite:///app.db')  #"postgresql://postgres:vikramisdevloper@database-1.c34momewg4x8.ap-south-1.rds.amazonaws.com:5432/postgres"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize the app with SQLAlchemy
@@ -44,11 +44,11 @@ app.register_blueprint(orders_bp, url_prefix='/order')
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return jsonify("hii")
 
 if __name__ == '__main__':
     with app.app_context():  # This establishes an application context
         db.create_all() 
         migrate.init_app(app, db)
-    # Running the app with debug mode
+    # Running the app with debug mod
     app.run(host='0.0.0.0', debug=True,port=8080)

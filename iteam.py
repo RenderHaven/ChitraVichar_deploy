@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Product, ProductItem, ProToItem, ProductItemVariation, Variation, VariationOption,Description
+from models import db, Product, ProductItem, ProToItem, ProductItemVariation,Description,ImgItem
 import uuid
 import base64
 import cloudinary
@@ -19,27 +19,21 @@ cloudinary.config(
 def add_item():
     try:
         data = request.json
+        print(data)
         product_id = data.get('product_id')
         item_name = data.get('name')
         price = data.get('price')
-        description_content = data.get('description', '')
+        description_content = data.get('description', None)
         quantity_in_stock = data.get('stock_quantity')
         base64_image = data.get('display_img', None)
         variation_value_ids = data.get('variation_value_ids', [])
-        disc_id = data.get('disc_id')
+        disc_id = data.get('disc_id',None)
         tag_name = data.get('tag_name', ' ')  # Tagname
         if  not item_name or price is None or quantity_in_stock is None:
             return jsonify({"error": "product_id, item name, price, and stock quantity are required"}), 400
 
 
         image_url = None
-        if base64_image:
-            try:
-                file_to_upload = base64.b64decode(base64_image)
-                upload_result = cloudinary.uploader.upload(file_to_upload)
-                image_url = upload_result.get('secure_url')
-            except Exception as e:
-                return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
 
         new_item = ProductItem(
             name=item_name,
@@ -60,11 +54,11 @@ def add_item():
             )
             db.session.add(new_pro_to_item)
             db.session.commit()
-
-        for variation_id in variation_value_ids:
-            new_relation = ProductItemVariation(product_item_id=new_item.i_id, variation_option_id=variation_id)
-            db.session.add(new_relation)
-        db.session.commit()
+        if(variation_value_ids):
+            for variation_id in variation_value_ids:
+                new_relation = ProductItemVariation(product_item_id=new_item.i_id, variation_option_id=variation_id)
+                db.session.add(new_relation)
+            db.session.commit()
 
         # Check if a disc_id was provided
         if disc_id:
@@ -77,7 +71,8 @@ def add_item():
                 return jsonify({"error": "Description not found for the provided disc_id"}), 404
         else:
             # Add a new description with tagline and content
-            if description_content and tag_name:
+            if description_content and tag_name and description_content!='':
+                print("gus aaya")
                 new_description = Description(
                     content=description_content,
                     tag_name=tag_name
@@ -85,7 +80,7 @@ def add_item():
                 db.session.commit()
                 new_item.disc_id=new_description.id
                 db.session.commit()
-
+        print("sucsess")
         return jsonify({
             "message": "Item added and linked to product successfully",
             "item_id": new_item.i_id,
@@ -94,6 +89,7 @@ def add_item():
 
     except Exception as e:
         db.session.rollback()
+        print(e)
         return jsonify({"error": str(e)}), 500
     
 
@@ -105,13 +101,10 @@ def edit_item():
         item_name = data.get('name')
         price = data.get('price')
         quantity_in_stock = data.get('stock_quantity')
-        base64_image = data.get('display_img', None)
-        is_img_changed = data.get('isImgChanged', False)
         description_content = data.get('description', '')
         variation_value_ids = data.get('variation_value_ids', [])
         disc_id = data.get('disc_id')
         tag_name = data.get('tag_name', ' ')
-        print(data)
         if not item_id:
             return jsonify({"error": "item_id is required"}), 400
 
@@ -126,18 +119,6 @@ def edit_item():
         existing_item.name = item_name
         existing_item.price = price
         existing_item.stock_quantity = quantity_in_stock
-
-        # Update or retain image URL
-        if is_img_changed:
-            if base64_image:
-                try:
-                    file_to_upload = base64.b64decode(base64_image)
-                    upload_result = cloudinary.uploader.upload(file_to_upload)
-                    existing_item.image_url = upload_result.get('secure_url')
-                except Exception as e:
-                    return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
-            else:
-                existing_item.image_url = None  # Clear image if no new image is provided
 
         # Update description
         if disc_id:
@@ -302,3 +283,109 @@ def get_items():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@item_bp.route('/upload_item_images', methods=['POST'])
+def upload_item_images():
+    try:
+        data = request.json
+        item_id = data.get('item_id')
+        base64_images = data.get('images', [])
+
+        if not item_id:
+            return jsonify({"error": "item_id is required"}), 400
+
+        if not base64_images:
+            return jsonify({"error": "No images provided"}), 400
+
+        existing_item = ProductItem.query.get(item_id)
+        if not existing_item:
+            return jsonify({"error": "Item not found"}), 404
+
+        uploaded_urls = []
+        for base64_image in base64_images:
+            try:
+                file_to_upload = base64.b64decode(base64_image)
+                upload_result = cloudinary.uploader.upload(file_to_upload)
+                image_url = upload_result.get('secure_url')
+
+                # Save image URL to ImgItem table
+                new_img_item = ImgItem(item_id=item_id, image_url=image_url)
+                db.session.add(new_img_item)
+                uploaded_urls.append(new_img_item.to_dict())
+            except Exception as e:
+                return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
+        
+        if(uploaded_urls):existing_item.image_url=uploaded_urls[0]['image_url']
+        db.session.commit()
+
+        return jsonify({
+            "message": "Images uploaded successfully",
+            "uploaded_images": uploaded_urls
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+    
+@item_bp.route('/edit_item_images', methods=['POST'])
+def edit_item_images():
+    try:
+        data = request.json
+        item_id = data.get('item_id')
+        images = data.get('images', [])
+
+        if not item_id:
+            return jsonify({"error": "item_id is required"}), 400
+
+        if not images:
+            return jsonify({"error": "No images provided"}), 400
+
+        # Check if the item exists
+        existing_item = ProductItem.query.get(item_id)
+        if not existing_item:
+            return jsonify({"error": "Item not found"}), 404
+
+        # Remove all existing images for the item
+        ImgItem.query.filter_by(item_id=item_id).delete()
+
+        updated_urls = []
+        for image in images:
+            image_id = image.get('id')
+            image_url = image.get('image_url')
+
+            if not image_url:
+                return jsonify({"error": "image_url is required for all images"}), 400
+
+            if image_id == "None":  # Upload new image to Cloudinary
+                try:
+                    # Decode and upload the base64 image
+                    file_to_upload = base64.b64decode(image_url)
+                    upload_result = cloudinary.uploader.upload(file_to_upload)
+                    uploaded_url = upload_result.get('secure_url')
+
+                    # Save new image in the database
+                    new_img_item = ImgItem(item_id=item_id, image_url=uploaded_url)
+                    db.session.add(new_img_item)
+                    updated_urls.append(new_img_item.to_dict())
+                except Exception as e:
+                    return jsonify({"error": f"Failed to upload new image: {str(e)}"}), 500
+            else:  # Add existing image directly
+                new_img_item = ImgItem(item_id=item_id, image_url=image_url)
+                db.session.add(new_img_item)
+                updated_urls.append(new_img_item.to_dict())
+        
+        if(updated_urls):existing_item.image_url=updated_urls[0]['image_url']
+
+        # Commit all changes
+        db.session.commit()
+
+        return jsonify({
+            "message": "Images updated successfully",
+            "updated_images": updated_urls
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+    

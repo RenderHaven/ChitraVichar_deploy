@@ -1,4 +1,25 @@
-.env
-__pycache__/
+# Python bytecode files
 *.pyc
+__pycache__/
+
+# Virtual environment
 venv/
+
+# Flask-related
+instance/
+.webassets-cache
+
+# Environment variables file
+.env
+
+# AWS Elastic Beanstalk
+.elasticbeanstalk/
+
+# Google Cloud ignore file
+.gcloudignore
+
+# IDE and OS specific files
+.idea/
+.vscode/
+*.swp
+.DS_Store

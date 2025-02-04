@@ -1,90 +1,121 @@
 import random
+import requests
 from flask import Blueprint, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 from models import db
 
-
 # Blueprint for OTP routes
 otp_bp = Blueprint('otp', __name__)
 
-# SMS Gateway Configuration
-SMS_GATEWAY_API_KEY = 'your_api_key'  # Replace with your SMS Gateway API key
-SMS_GATEWAY_DEVICE_ID = 'your_device_id'  # Replace with your SMS Gateway device ID
-SMS_GATEWAY_URL = 'https://smsgateway.me/api/v4/message/send'
+# Brevo (Sendinblue) Configuration
+BREVO_API_KEY = "your_brevo_api_key"  # Replace with your actual API key
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
-# OTP model
 class OTP(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    number = db.Column(db.String(15), nullable=False)
+    contact = db.Column(db.String(50), nullable=False)
     otp = db.Column(db.String(6), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# Helper function to send SMS via SMS Gateway
-def send_sms_via_gateway(phone_number, message):
-    payload = [
-        {
-            "phone_number": phone_number,
-            "message": message,
-            "device_id": SMS_GATEWAY_DEVICE_ID
+class MobileOTP:
+    @staticmethod
+    def send_otp(number):
+        otp_code = f"{random.randint(100000, 999999)}"
+        existing_otp = OTP.query.filter_by(contact=number).first()
+        if existing_otp:
+            db.session.delete(existing_otp)
+        
+        new_otp = OTP(contact=number, otp=otp_code)
+        db.session.add(new_otp)
+        db.session.commit()
+        
+        return otp_code
+    
+    @staticmethod
+    def verify_otp(number, otp):
+        record = OTP.query.filter_by(contact=number).first()
+        if not record:
+            return False, 'Invalid OTP or number.'
+        if datetime.utcnow() > record.created_at + timedelta(minutes=5):
+            db.session.delete(record)
+            db.session.commit()
+            return False, 'OTP expired. Please request a new one.'
+        if record.otp != otp:
+            return False, 'Invalid OTP.'
+        
+        db.session.delete(record)
+        db.session.commit()
+        return True, 'OTP verified successfully.'
+
+class EmailOTP:
+    @staticmethod
+    def send_otp(email):
+        otp_code = f"{random.randint(100000, 999999)}"
+        existing_otp = OTP.query.filter_by(contact=email).first()
+        if existing_otp:
+            db.session.delete(existing_otp)
+        
+        new_otp = OTP(contact=email, otp=otp_code)
+        db.session.add(new_otp)
+        db.session.commit()
+        
+        payload = {
+            "sender": {"name": "YourApp", "email": "no-reply@yourapp.com"},
+            "to": [{"email": email}],
+            "subject": "Your OTP Code",
+            "htmlContent": f"<p>Your OTP code is <strong>{otp_code}</strong>. It expires in 5 minutes.</p>"
         }
-    ]
-    headers = {'Authorization': SMS_GATEWAY_API_KEY}
-    response = requests.post(SMS_GATEWAY_URL, json=payload, headers=headers)
-    return response
+        headers = {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json"
+        }
+        response = requests.post(BREVO_URL, json=payload, headers=headers)
+        
+        if response.status_code != 201:
+            raise Exception(response.text)
+        
+        return otp_code
+    
+    @staticmethod
+    def verify_otp(email, otp):
+        return MobileOTP.verify_otp(email, otp)
 
 @otp_bp.route('/send_otp', methods=['POST'])
 def send_otp():
     data = request.json
-    number = data.get('number')
-
-    if not number:
-        return jsonify({'message': 'Mobile number is required.'}), 400
-
-    otp_code = f"{random.randint(100000, 999999)}"
-
-    existing_otp = OTP.query.filter_by(number=number).first()
-    if existing_otp:
-        db.session.delete(existing_otp)
-
-    new_otp = OTP(number=number, otp=otp_code)
-    db.session.add(new_otp)
-    db.session.commit()
-
+    contact = data.get('contact')
+    contact_type = data.get('type')  # 'email' or 'mobile'
+    
+    if not contact or not contact_type:
+        return jsonify({'message': 'Contact and type are required.'}), 400
+    
     try:
-        # Send OTP via SMS Gateway
-        response = send_sms_via_gateway(number, f"Your OTP code is {otp_code}")
-        if response.status_code != 200:
-            raise Exception(response.text)
+        if contact_type == 'mobile':
+            MobileOTP.send_otp(contact)
+        elif contact_type == 'email':
+            EmailOTP.send_otp(contact)
+        else:
+            return jsonify({'message': 'Invalid contact type.'}), 400
     except Exception as e:
-        return jsonify({'message': f"Failed to send OTP: {str(e)}"}), 500
-
+        return jsonify({'message': f'Failed to send OTP: {str(e)}'}), 500
+    
     return jsonify({'message': 'OTP sent successfully.'}), 200
 
 @otp_bp.route('/verify_otp', methods=['POST'])
 def verify_otp():
     data = request.json
-    number = data.get('number')
+    contact = data.get('contact')
     otp = data.get('otp')
-
-    if not number or not otp:
-        return jsonify({'message': 'Mobile number and OTP are required.'}), 400
-
-    record = OTP.query.filter_by(number=number).first()
-
-    if not record:
-        return jsonify({'message': 'Invalid OTP or number.'}), 400
-
-    # Check OTP validity (5 minutes expiration)
-    if datetime.utcnow() > record.created_at + timedelta(minutes=5):
-        db.session.delete(record)
-        db.session.commit()
-        return jsonify({'message': 'OTP expired. Please request a new one.'}), 400
-
-    if record.otp != otp:
-        return jsonify({'message': 'Invalid OTP.'}), 400
-
-    db.session.delete(record)
-    db.session.commit()
-
-    return jsonify({'message': 'OTP verified successfully.'}), 200
+    contact_type = data.get('type')
+    
+    if not contact or not otp or not contact_type:
+        return jsonify({'message': 'Contact, OTP, and type are required.'}), 400
+    
+    success, message = (MobileOTP.verify_otp(contact, otp) if contact_type == 'mobile' 
+                        else EmailOTP.verify_otp(contact, otp))
+    
+    if success:
+        return jsonify({'message': message}), 200
+    return jsonify({'message': message}), 400
