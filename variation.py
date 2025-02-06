@@ -175,12 +175,10 @@ def search_variations():
 @variation_bp.route('/edit_variation/<string:variation_id>', methods=['PUT'])
 def edit_variation(variation_id):
     """
-    Edit a variation's name or options.
+    Edit a variation's name or options while preserving foreign key integrity.
     """
     try:
         data = request.get_json()
-
-        # Validate input
         new_name = data.get('name')
         new_options = data.get('options', [])
 
@@ -192,41 +190,45 @@ def edit_variation(variation_id):
         if not variation:
             return jsonify({"error": "Variation not found"}), 404
 
-        # Update the variation name
+        # Update variation name
         variation.name = new_name
+
+        # Fetch existing options for this variation
+        existing_options = {opt.id: opt for opt in VariationOption.query.filter_by(variation_id=variation_id).all()}
+
+        # Track option IDs that should remain
+        received_option_ids = set()
+        
+        for option in new_options:
+            option_id = option.get('id')
+            option_value = option.get('value')
+            option_disc = option.get('disc')
+
+            if not option_value:
+                return jsonify({"error": "Option value is required"}), 400
+
+            if option_id in existing_options:
+                # Update existing option
+                existing_options[option_id].value = option_value
+                existing_options[option_id].disc = option_disc
+                received_option_ids.add(option_id)
+            else:
+                # Add new option
+                new_option = VariationOption(value=option_value, variation_id=variation_id, disc=option_disc)
+                db.session.add(new_option)
+
+        # Remove options that were not included in the request
+        for opt_id in set(existing_options.keys()) - received_option_ids:
+            db.session.delete(existing_options[opt_id])
+
         db.session.commit()
-
-        VariationOption.query.filter_by(variation_id=variation_id).delete()
-
-        # Update variation options
-        if new_options:
-            for option in new_options:
-                option_value = option.get('value')
-                option_id = option.get('id')
-                option_disc=option.get('disc')
-                print(option)
-                if not option_value:
-                    return jsonify({"error": "Option value is required"}), 400
-
-                # Check if option_id exists and update the option value
-                existing_option = VariationOption.query.get(option_id)
-                if existing_option and existing_option.variation_id == variation_id:
-                    # Update the existing option
-                    existing_option.value = option_value
-                    existing_option.disc=option_disc
-                else:
-                    # Add a new option if no existing option matches the option_id
-                    new_option = VariationOption(value=option_value, variation_id=variation_id,disc=option_disc)
-                    db.session.add(new_option)
-
-            db.session.commit()
-
         return jsonify({"message": "Variation updated successfully"}), 200
 
     except Exception as e:
         print(e)
         db.session.rollback()
         return jsonify({"error": f"An error occurred: {str(e)}"}), 500
+
 
 
 
