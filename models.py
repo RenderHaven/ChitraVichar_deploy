@@ -67,7 +67,7 @@ class Product(db.Model):
             "discount": self.discount,
             "items_id": [item.i_id for item in self.product_items],
         }
-    def to_small(self):
+    def to_small_dict(self):
         return {
             "p_id": self.p_id,
             "c_id" :self.c_id,
