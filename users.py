@@ -195,14 +195,23 @@ def get_card_item(user_id):
 def add_to_cart():
     data = request.json
     try:
+        # Check if the item already exists in the cart for the same user
+        existing_item = Cart.query.filter_by(i_id=data['i_id'], user_id=data['user_id']).first()
+
+        if existing_item:
+            return jsonify({"message": "Item already exists in the cart"}), 409  # HTTP 409 Conflict
+        
+        # If item does not exist, add it to the cart
         order = Cart(**data)
         db.session.add(order)
         db.session.commit()
-        return jsonify(order.to_dict()), 201
+        return jsonify(order.to_dict()), 201  # HTTP 201 Created
+    
     except DatabaseError as err:
         db.session.rollback()
         print(err)
-        return jsonify({"error": str(err)}), 400
+        return jsonify({"error": str(err)}), 400  # HTTP 400 Bad Request
+
     
 
 @user_bp.route('/remove_from_cart/<string:cart_id>', methods=['DELETE'])

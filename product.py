@@ -206,12 +206,18 @@ def get_products_by_category(category_id):
             return jsonify({"message": "No products found for this category"}), 200
 
         # Extract product details
-        product_ids = [product.p_id for product in all_products]
-        product_names = [product.name for product in all_products]
-        
+        product_ids = []
+        product_names = []
+        product_images = []
+
+        for product in all_products:
+            product_ids.append(product.p_id)
+            product_names.append(product.name)
+            product_images.append(product.image_url)
         return jsonify({
             "category_id": category_id,
             "product_ids": product_ids,
+            "product_images": product_images,
             "product_names": product_names
         }), 200
 
