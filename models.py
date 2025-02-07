@@ -93,7 +93,7 @@ class ProductItem(db.Model):
     products = relationship('Product', secondary='product_to_items', back_populates="product_items")
     variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan")
     orders = db.relationship('Order', backref='item', lazy=True)
-    carts = db.relationship('Cart', backref='item', lazy=True)
+    carts = db.relationship('Cart', backref='item', lazy=True,cascade="all, delete-orphan")
 
     def _get_max_discount(self):
         """ Helper function to calculate the maximum discount from variations and products """
@@ -263,6 +263,8 @@ class Cart(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)  # Reference to User
     i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=False)  # Reference to ProductItem
+
+    
     
     def to_dict(self):
         data=self.item.to_small_dict()
