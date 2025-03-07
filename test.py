@@ -105,18 +105,17 @@ def insert_data():
             option = VariationOption(value=option_value, variation_id=variation.id)
             db.session.add(option)
         db.session.commit()
-    user = User(
-        id='User1',
-        name='Vikram',
-        number='+919461373630',
-        email='vikrambalai1002@gmail.com',
-        last_name='Balai',
-        gender='Male',
-        image_url='https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcyI9Cvp53aaP9XeRn-ZKbJDH2QaWC72O26A&s',
-        password=generate_password_hash('1234567890', method='pbkdf2:sha256')
-    )
-    db.session.add(user)
-    db.session.commit()
+    # user = User(
+    #     id='User1',
+    #     name='Vikram',
+    #     number='+919461373630',
+    #     email='vikrambalai1002@gmail.com',
+    #     last_name='Balai',
+    #     gender='Male',
+    #     password=generate_password_hash('1234567890', method='pbkdf2:sha256')
+    # )
+    # db.session.add(user)
+    # db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context():

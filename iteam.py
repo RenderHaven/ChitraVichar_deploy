@@ -202,7 +202,9 @@ def get_item_by_id(item_id, all='false'):
         if not item:
             return jsonify({"error": "Item not found"}), 404
 
-        item_data=item.to_dict()
+        if(all=='true'):
+            item_data=item.to_dict()
+        else :item_data=item.to_small_dict()
 
         return jsonify(item_data), 200
 

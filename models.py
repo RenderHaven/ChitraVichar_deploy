@@ -2,7 +2,7 @@ import uuid
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, Column, Integer, String, Float,Text
 from sqlalchemy.orm import relationship
-
+from collections import defaultdict
 db = SQLAlchemy()
 
 
@@ -48,6 +48,7 @@ class Product(db.Model):
     image_url = db.Column(db.String(500))
     c_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=False)
     is_active = db.Column(db.Boolean, default=True)  # Boolean column
+    is_new = db.Column(db.Boolean, default=True)  # Boolean column
     category = relationship("Category", back_populates="products")
     description = relationship("Description", backref="products")  # Relationship with Description table
     Type = db.Column(db.String(200), nullable=False, default="Other")
@@ -59,13 +60,15 @@ class Product(db.Model):
             "p_id": self.p_id,
             "c_id" :self.c_id,
             "name": self.name,
-            "description": self.description.content if self.description else None,  # Use the Description relation
-            "tag_name": self.description.tag_name if self.description else None,
-            'disc_id': self.description.id if self.description else None,
+            # "description": self.description.content if self.description else None,  # Use the Description relation
+            # "tag_name": self.description.tag_name if self.description else None,
+            # 'disc_id': self.description.id if self.description else None,
             "image_url": self.image_url,
             "Type": self.Type,
             "discount": self.discount,
             "items_id": [item.i_id for item in self.product_items],
+            "is_active": self.is_active,
+            "is_new": self.is_new,
         }
     def to_small_dict(self):
         return {
@@ -76,6 +79,8 @@ class Product(db.Model):
             "tag_name": self.description.tag_name if self.description else None,
             "Type": self.Type,
             "discount": self.discount,
+            "is_active": self.is_active,
+            "is_new": self.is_new,
         }
 
 
@@ -109,13 +114,49 @@ class ProductItem(db.Model):
                         max_discount = max(max_discount, float(value))
 
         for product in self.products:
-            if product.Type == 'Discount' and isinstance(product.discount, (int, float)):
+            if isinstance(product.discount, (int, float)):
                 max_discount = max(max_discount, float(product.discount))
         print("cddc")
         return max_discount
+    
+    def _group_variation_data(self):
+        grouped_data = defaultdict(lambda: {"variation_name": None, "options": []})
+        max_discount = 0.0  # Store max discount separately
+
+        for var in self.variations:
+            item = var.variation_option.to_dict()
+            variation_id = item["variation_id"]
+            
+            # Set variation_name once per variation_id
+            if grouped_data[variation_id]["variation_name"] is None:
+                grouped_data[variation_id]["variation_name"] = item["variation_name"]
+
+            # Add option details
+            grouped_data[variation_id]["options"].append({
+                "id": item["id"],
+                "value": item["value"]
+            })
+
+            # Compute max discount separately
+            if item.get("variation_name") == "Discount":
+                value = item.get("value", "")
+                if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
+                    max_discount = max(max_discount, float(value))
+
+        # Convert dictionary to list format
+        result = [
+            {
+                "variation_id": var_id,
+                "variation_name": data["variation_name"],
+                "options": data["options"]
+            }
+            for var_id, data in grouped_data.items()
+        ]
+
+        return result, max_discount   # Return both variations and discount separately
         
     def to_dict(self):
-        max_discount = self._get_max_discount()
+        grouped_variations, max_discount = self._group_variation_data()
 
         return {
             "i_id": self.i_id,
@@ -129,19 +170,32 @@ class ProductItem(db.Model):
             "products_id": [product.p_id for product in self.products],
             "images": [image.to_dict() for image in self.images],
             "products": [{'name': product.name, 'p_id': product.p_id} for product in self.products],
-            "variations": [variation.variation_option.to_dict() for variation in self.variations if variation.variation_option],
+            "variations": grouped_variations,
             "discount": max_discount,
         }
 
     def to_small_dict(self):
-        max_discount = self._get_max_discount()
+        grouped_variations, max_discount = self._group_variation_data()
+        print(self._group_variation_data())
+        return {
+            "i_id": self.i_id,
+            "name": self.name,
+            "image_url": self.image_url,
+            "price": self.price,
+            "variations": grouped_variations,
+            "my_options":[variation.variation_option.id for variation in self.variations if variation.variation_option],  #localfilter
+            "discount": max_discount,
+        }
+    
+    def to_cart_dict(self):
+        grouped_variations, max_discount = self._group_variation_data()
 
         return {
             "i_id": self.i_id,
             "name": self.name,
             "image_url": self.image_url,
             "price": self.price,
-            "variations": [variation.variation_option.to_dict() for variation in self.variations if variation.variation_option],
+            "variations": grouped_variations,
             "discount": max_discount,
         }
 
@@ -216,15 +270,15 @@ class ProductItemVariation(db.Model):
 class User(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name = db.Column(db.String(200), nullable=True)
-    image_url = db.Column(db.String(500))
+    image_url = db.Column(db.String(500),nullable=True)
     last_name = db.Column(db.String(200), nullable=True)
     email = db.Column(db.String(200), nullable=True)
     dob= db.Column(db.String(50), nullable=True)
     gender= db.Column(db.String(50), nullable=True)
     number = db.Column(db.String(15), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False,default='123456')
-    addresses = db.relationship('Address', backref='user', lazy=True)
-    orders = db.relationship('Order', backref='user', lazy=True) 
+    addresses = db.relationship('Address', backref='user', lazy='select')
+    orders = db.relationship('Order', backref='user', lazy='select') 
     def to_dict(self):
         return {
             "id": self.id,
@@ -235,7 +289,7 @@ class User(db.Model):
             'dob':self.dob,
             'gender':self.gender,
             'profile_picture':self.image_url,
-            # 'my_addresses':[add.to_dict() for add in self.addresses],
+            'my_addresses':[add.to_dict() for add in self.addresses],
             # 'my_orders':[order.to_dict() for order in self.orders]
         }
 
@@ -247,6 +301,7 @@ class Address(db.Model):
     city = db.Column(db.String(100), nullable=False)
     state = db.Column(db.String(100), nullable=False)
     zip_code = db.Column(db.String(20), nullable=False)
+
 
     def to_dict(self):
         return {
@@ -315,7 +370,7 @@ class OrderItems(db.Model):
 # New model for storing image URLs
 class ImgItem(db.Model):
     __tablename__ = 'img_items'
-
+    
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     item_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=False)
     image_url = db.Column(db.String(500), nullable=False)
@@ -328,3 +383,4 @@ class ImgItem(db.Model):
             "item_id": self.item_id,
             "image_url": self.image_url,
         }
+    

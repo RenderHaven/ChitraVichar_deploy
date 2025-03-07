@@ -28,11 +28,13 @@ def add_product():
         data = request.json
         pc_id = data.get('pc_id')  # Parent category ID
         product_name = data.get('name')  # Product name
-        description_content = data.get('description', '')  # Optional product description
-        tag_name = data.get('tag_name', ' ')  # Tagname
+        # description_content = data.get('description', '')  # Optional product description
+        # tag_name = data.get('tag_name', ' ')  # Tagname
+        # disc_id = data.get('disc_id')  # Description ID
         typ = data.get('type')
         discount=data.get('discount')
-        disc_id = data.get('disc_id')  # Description ID
+        is_active = bool(data.get('is_active')) if data.get('is_active') is not None else None
+        is_new = bool(data.get('is_new')) if data.get('is_new') is not None else None
 
         if not pc_id or not product_name:
             return jsonify({"error": "pc_id and name are required"}), 400
@@ -54,28 +56,30 @@ def add_product():
         new_product = Product(
             name=product_name,
             c_id=new_category.c_id,
-            disc_id=disc_id,  # Use the provided description ID if available
+            # disc_id=disc_id,  # Use the provided description ID if available
             discount=discount,
-            Type=typ
+            Type=typ,
+            is_active=is_active,
+            is_new=is_new,
         )
         db.session.add(new_product)
         db.session.commit()
 
-        # Check if a disc_id was provided
-        if disc_id:
-            # Validate the provided description ID
-            existing_description = Description.query.get(disc_id)
-            if not existing_description:
-                return jsonify({"error": "Description not found for the provided disc_id"}), 404
-        else:
-            # Add a new description if content and tag_name are provided
-            if description_content and tag_name:
-                new_description = Description(
-                    content=description_content,
-                    tag_name=tag_name
-                )
-                db.session.add(new_description)
-                db.session.commit()
+        # # Check if a disc_id was provided
+        # if disc_id:
+        #     # Validate the provided description ID
+        #     existing_description = Description.query.get(disc_id)
+        #     if not existing_description:
+        #         return jsonify({"error": "Description not found for the provided disc_id"}), 404
+        # else:
+        #     # Add a new description if content and tag_name are provided
+        #     if description_content and tag_name:
+        #         new_description = Description(
+        #             content=description_content,
+        #             tag_name=tag_name
+        #         )
+        #         db.session.add(new_description)
+        #         db.session.commit()
 
         return jsonify({
             "message": "Product added successfully",
@@ -87,6 +91,60 @@ def add_product():
         db.session.rollback()
         print(e)
         return jsonify({"error": str(e)}), 500
+    
+@product_bp.route('/edit_product/<string:product_id>', methods=['PUT'])
+def edit_product(product_id):
+    """
+    Edits an existing product, allowing updates to name, type, discount, is_active, and is_new.
+    """
+    try:
+        # Parse request data
+        data = request.json
+        new_name = data.get('name')
+        new_type = data.get('type')
+        new_discount = data.get('discount')
+        is_active = bool(data.get('is_active')) if data.get('is_active') is not None else None
+        is_new = bool(data.get('is_new')) if data.get('is_new') is not None else None
+
+        # Find the product
+        product = Product.query.get_or_404(product_id)
+
+        # Update the product fields only if new values are provided
+        if new_name is not None and new_name.strip():
+            product.name = new_name
+        if new_type is not None and new_type.strip():
+            product.Type = new_type
+        if new_discount is not None:
+            product.discount = new_discount
+        if is_active is not None:
+            product.is_active = is_active
+        if is_new is not None:
+            product.is_new = is_new
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Product updated successfully",
+            "product": {
+                "id": product.id,
+                "name": product.name,
+                "type": product.Type,
+                "discount": product.discount,
+                "is_active": product.is_active,
+                "is_new": product.is_new
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+    
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
     
 @product_bp.route('/upload_product_image', methods=['POST'])
 def upload_product_image():
@@ -207,18 +265,14 @@ def get_products_by_category(category_id):
 
         # Extract product details
         product_ids = []
-        product_names = []
-        product_images = []
-
+        products_data = []
         for product in all_products:
             product_ids.append(product.p_id)
-            product_names.append(product.name)
-            product_images.append(product.image_url)
+            products_data.append({'p_id':product.p_id,'c_id':product.c_id,'name':product.name,'image_url':product.image_url})
         return jsonify({
             "category_id": category_id,
             "product_ids": product_ids,
-            "product_images": product_images,
-            "product_names": product_names
+            "products_data":products_data
         }), 200
 
     except Exception as e:
@@ -235,18 +289,15 @@ def get_items_by_product_id(product_id):
         if not product:
             return jsonify({"error": "Product not found"}), 404
 
-        # Fetch the related product items via the relationship
-        product_to_items = ProToItem.query.filter_by(p_id=product_id).all()
 
-        # Serialize the data
-        items_ids = [
-            item.i_id for item in product_to_items
+        items_data=[
+            {'i_id':item.i_id,'name':item.name,'image_url':item.image_url,'price':item.price} for item in product.product_items
         ]
 
         return jsonify({
             "product_id": product.p_id,
             "product_name": product.name,
-            "item_ids":items_ids,
+            "items_data":items_data
         }), 200
 
     except Exception as e:
@@ -266,7 +317,13 @@ def search_products():
     else:
         products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
 
-    result = [p.to_small_dict() for p in products]
+    result = [{
+            "p_id": p.p_id,
+            "c_id" :p.c_id,
+            "name": p.name,
+            "Type": p.Type,
+            "discount": p.discount,
+        } for p in products]
     return jsonify(result), 200
 
 
@@ -317,7 +374,7 @@ def get_products_by_gender():
         ).all()
 
         if not all_products:
-            return jsonify({"message": "No products found for the specified types"}), 200
+            return jsonify([]), 200
 
         # Prepare product data
         data = [
