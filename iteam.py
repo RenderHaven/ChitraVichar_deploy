@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, ProductItemVariation,Description,ImgItem
 import uuid
 import base64
@@ -18,6 +18,8 @@ cloudinary.config(
 @item_bp.route('/add_item', methods=['POST'])
 def add_item():
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         print(data)
         product_id = data.get('product_id')
@@ -97,6 +99,8 @@ def add_item():
 @item_bp.route('/edit_item', methods=['PUT'])
 def edit_item():
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         item_id = data.get('item_id')
         item_name = data.get('name')
@@ -159,6 +163,8 @@ def edit_item():
 @item_bp.route('/remove_item/<string:item_id>', methods=['DELETE'])
 def remove_item(item_id):
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         item = ProductItem.query.get(item_id)
         if not item:
             return jsonify({"error": "Item not found"}), 404
@@ -177,6 +183,7 @@ def remove_item(item_id):
 @item_bp.route('/get_products_by_item/<string:item_id>', methods=['GET'])
 def get_products_by_item_id(item_id):
     try:
+
         item = ProductItem.query.filter_by(i_id=item_id).first()
         if not item:
             return jsonify({"error": "Product not found"}), 404
@@ -198,6 +205,7 @@ def get_products_by_item_id(item_id):
 @item_bp.route('/get_item/<string:item_id>/<string:all>', methods=['GET'])
 def get_item_by_id(item_id, all='false'):
     try:
+
         item = ProductItem.query.filter_by(i_id=item_id).first()
         if not item:
             return jsonify({"error": "Item not found"}), 404
@@ -240,6 +248,8 @@ def search_items():
 @item_bp.route('/add_items_to_product/<string:product_id>', methods=['POST'])
 def add_items_to_product(product_id):
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         item_ids = request.json.get('item_ids', [])
         product = Product.query.get_or_404(product_id)
 
@@ -279,6 +289,8 @@ def get_items():
 @item_bp.route('/upload_item_images', methods=['POST'])
 def upload_item_images():
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         item_id = data.get('item_id')
         base64_images = data.get('images', [])
@@ -322,6 +334,8 @@ def upload_item_images():
 @item_bp.route('/edit_item_images', methods=['POST'])
 def edit_item_images():
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         item_id = data.get('item_id')
         images = data.get('images', [])

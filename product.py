@@ -1,22 +1,16 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, Description
 import uuid
 import base64
 import cloudinary
 import cloudinary.uploader
 import category as Cat
-from sqlalchemy import or_,text
+from sqlalchemy import or_,text,and_
 from sqlalchemy.orm import joinedload
-
+import config
 # Create the Blueprint
 product_bp = Blueprint('product', __name__)
 
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name="dimdoq0ng",
-    api_key="324659127373814",
-    api_secret="eUTC_Jxfvw95dkaCDN7yHEomugE"
-)
 
 
 @product_bp.route('/add_product', methods=['POST'])
@@ -25,6 +19,9 @@ def add_product():
     Adds a new product and creates a corresponding category with the product name.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+        
         # Parse request data
         data = request.json
         pc_id = data.get('c_id')  # Parent category ID
@@ -75,6 +72,8 @@ def edit_product(product_id):
     Edits an existing product, allowing updates to name, type, discount, is_active, and is_new.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         # Parse request data
         data = request.json
         new_name = data.get('name')
@@ -129,6 +128,9 @@ def upload_product_image():
     Uploads an image for an existing product and updates its image_url.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+        
         data = request.json
         product_id = data.get('product_id')
         base64_image = data.get('display_img')
@@ -142,12 +144,7 @@ def upload_product_image():
             return jsonify({"error": "Product not found"}), 404
 
         # Upload image to Cloudinary
-        try:
-            file_to_upload = base64.b64decode(base64_image)
-            upload_result = cloudinary.uploader.upload(file_to_upload)
-            image_url = upload_result.get('secure_url')
-        except Exception as e:
-            return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
+        image_url=config.uploadImg(base64_image)
 
         # Update product image_url
         product.image_url = image_url
@@ -188,9 +185,16 @@ def get_products_by_category(c_id):
     """
     try:
         if(c_id=='null'):c_id=None
-        # Find the subcategories under the given category_id
-        all_products = Product.query.filter_by(parent_id=c_id).all()
-
+        # Find the subcategories under the given category_id\
+        if g.is_valid_request:
+            all_products = Product.query.filter_by(parent_id=c_id).all()
+        else :
+            all_products = Product.query.filter(
+            and_(
+                Product.parent_id == c_id,
+                Product.is_active == True   # Inverts the boolean condition
+            )
+            ).all()
 
         if not all_products:
             return jsonify({"message": "No products found for this category"}), 200
@@ -243,16 +247,38 @@ def search_products():
     query = request.args.get('query', '').strip()
     if len(query) < 3:
         return jsonify({"error": "Search query must be at least 3 characters long"}), 400
-
-    # Search products by name (case-insensitive)
-    if query == '<all>':
+    
+    if g.is_valid_request:
         products = Product.query.all()
     else:
-        products = Product.query.filter(Product.name.ilike(f"%{query}%")).all()
+        products = Product.query.filter(Product.is_active == True).all()
 
     result = [{
             "p_id": p.p_id,
-            "c_id" :p.c_id,
+            "c_id" :p.parent_id,
+            "name": p.name,
+            # "Type": p.Type,
+            # "discount": p.discount,
+        } for p in products]
+    return jsonify(result), 200
+
+@product_bp.route('/search_query', methods=['GET'])
+def search_products_byquery():
+    query = request.args.get('query', '').strip()
+    if len(query) < 3:
+        return jsonify({"error": "Search query must be at least 3 characters long"}), 400
+    
+        
+
+    # Search products by name (case-insensitive)
+    if g.is_valid_request:
+        products = Product.query.all()
+    else:
+        products = query.filter(Product.is_active == True).all()
+
+    result = [{
+            "p_id": p.p_id,
+            "c_id" :p.parent_id,
             "name": p.name,
             "Type": p.Type,
             "discount": p.discount,
@@ -266,6 +292,10 @@ def remove_item_from_product(product_id):
     Remove an item from a specific product.
     """
     try:
+        auth_error = config.verify_api_key()
+        if auth_error:
+            return auth_error
+        
         data = request.get_json()
         item_id = data.get('item_id')
 
@@ -382,7 +412,8 @@ def item_from_product():
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):
     try:
-        
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         # Find the product by its ID
         product = Product.query.get(product_id)
         if(product_id in ('Home','Pro','New')):

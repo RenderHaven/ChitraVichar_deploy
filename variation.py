@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,g
 from models import db, Variation, VariationOption ,ProductItem ,ProductItemVariation
 from sqlalchemy.exc import IntegrityError
 
@@ -8,6 +8,8 @@ variation_bp = Blueprint('variation_bp', __name__)
 @variation_bp.route('/add_variation', methods=['POST'])
 def add_variation():
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         # Get data from request body
         data = request.get_json()
 
@@ -66,8 +68,10 @@ def attach_variation_to_item():
     Attach a variation option to a product item.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.get_json()
-
+        
         # Validate input
         item_id = data.get('item_id')
         variation_option_id = data.get('variation_option_id')
@@ -178,6 +182,8 @@ def edit_variation(variation_id):
     Edit a variation's name or options while preserving foreign key integrity.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         data = request.get_json()
         new_name = data.get('name')
         new_options = data.get('options', [])
@@ -239,6 +245,8 @@ def delete_variation(variation_id):
     Delete a variation and its options.
     """
     try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         # Find the variation
         variation = Variation.query.get(variation_id)
         if not variation:
