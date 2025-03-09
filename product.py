@@ -1,11 +1,12 @@
 from flask import Blueprint, request, jsonify
-from models import db, Product, Category, ProductItem, ProToItem, Description
+from models import db, Product, ProductItem, ProToItem, Description
 import uuid
 import base64
 import cloudinary
 import cloudinary.uploader
 import category as Cat
-from sqlalchemy import or_
+from sqlalchemy import or_,text
+from sqlalchemy.orm import joinedload
 
 # Create the Blueprint
 product_bp = Blueprint('product', __name__)
@@ -26,7 +27,7 @@ def add_product():
     try:
         # Parse request data
         data = request.json
-        pc_id = data.get('pc_id')  # Parent category ID
+        pc_id = data.get('c_id')  # Parent category ID
         product_name = data.get('name')  # Product name
         # description_content = data.get('description', '')  # Optional product description
         # tag_name = data.get('tag_name', ' ')  # Tagname
@@ -35,27 +36,19 @@ def add_product():
         discount=data.get('discount')
         is_active = bool(data.get('is_active')) if data.get('is_active') is not None else None
         is_new = bool(data.get('is_new')) if data.get('is_new') is not None else None
-
+        print(data)
         if not pc_id or not product_name:
             return jsonify({"error": "pc_id and name are required"}), 400
 
         # Check if the parent category exists
-        parent_category = Category.query.get(pc_id)
-        if not parent_category:
+        parent_product = Product.query.get(pc_id)
+        if not parent_product:
             return jsonify({"error": "Parent category not found"}), 404
         
-        new_category = Category(
-            c_id=str(uuid.uuid4()),
-            pc_id=pc_id,
-            name=product_name
-        )
-        db.session.add(new_category)
-        db.session.commit()
-
         # Create a new product under the newly created category
         new_product = Product(
             name=product_name,
-            c_id=new_category.c_id,
+            parent_id=pc_id,
             # disc_id=disc_id,  # Use the provided description ID if available
             discount=discount,
             Type=typ,
@@ -65,26 +58,10 @@ def add_product():
         db.session.add(new_product)
         db.session.commit()
 
-        # # Check if a disc_id was provided
-        # if disc_id:
-        #     # Validate the provided description ID
-        #     existing_description = Description.query.get(disc_id)
-        #     if not existing_description:
-        #         return jsonify({"error": "Description not found for the provided disc_id"}), 404
-        # else:
-        #     # Add a new description if content and tag_name are provided
-        #     if description_content and tag_name:
-        #         new_description = Description(
-        #             content=description_content,
-        #             tag_name=tag_name
-        #         )
-        #         db.session.add(new_description)
-        #         db.session.commit()
-
         return jsonify({
             "message": "Product added successfully",
             "product_id": new_product.p_id,
-            "category_id": new_category.c_id
+            "category_id": pc_id,
         }), 201
 
     except Exception as e:
@@ -126,7 +103,7 @@ def edit_product(product_id):
         return jsonify({
             "message": "Product updated successfully",
             "product": {
-                "id": product.id,
+                "p_id": product.p_id,
                 "name": product.name,
                 "type": product.Type,
                 "discount": product.discount,
@@ -203,62 +180,17 @@ def get_product_by_id(product_id):
         return jsonify({"error": str(e)}), 500
 
 
-@product_bp.route('/update_product_description/<string:product_id>', methods=['PUT'])
-def update_product_description(product_id):
-    """
-    Updates the description of a specific product.
-    """
-    try:
-        # Parse request data
-        data = request.json
-        new_description = data.get('description')
-
-        if not new_description:
-            return jsonify({"error": "Description content is required"}), 400
-
-        # Check if the product exists
-        product = Product.query.get(product_id)
-        if not product:
-            return jsonify({"error": "Product not found"}), 404
-
-        # Update or create the description in the `Description` table
-        description = Description.query.filter_by(table_name='products', record_id=product_id).first()
-        if description:
-            description.content = new_description
-        else:
-            description = Description(
-                table_name='products',
-                record_id=product_id,
-                content=new_description
-            )
-            db.session.add(description)
-
-        db.session.commit()
-
-        return jsonify({"message": "Product description updated successfully"}), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 500
-
-
-
-@product_bp.route('/get_products_by_category/<string:category_id>', methods=['GET'])
-def get_products_by_category(category_id):
+@product_bp.route('/get_products_by_category/<string:c_id>', methods=['GET'])
+def get_products_by_category(c_id):
     """
     Retrieves a list of product IDs for a given parent category ID (pc_id),
     including products of all subcategories.
     """
     try:
+        if(c_id=='null'):c_id=None
         # Find the subcategories under the given category_id
-        subcategories = Category.query.filter_by(pc_id=category_id).all()
-        if not subcategories:
-            return jsonify({"message": "No subcategories found for this category"}), 200
+        all_products = Product.query.filter_by(parent_id=c_id).all()
 
-        # Collect all products using the back-populated relationship
-        all_products = []
-        for subcategory in subcategories:
-            all_products.extend(subcategory.products)  # Access related products directly
 
         if not all_products:
             return jsonify({"message": "No products found for this category"}), 200
@@ -268,12 +200,13 @@ def get_products_by_category(category_id):
         products_data = []
         for product in all_products:
             product_ids.append(product.p_id)
-            products_data.append({'p_id':product.p_id,'c_id':product.c_id,'name':product.name,'image_url':product.image_url})
+            products_data.append(product.to_small_dict())
         return jsonify({
-            "category_id": category_id,
+            "category_id": c_id,
             "product_ids": product_ids,
             "products_data":products_data
         }), 200
+    
 
     except Exception as e:
         db.session.rollback()
@@ -284,20 +217,20 @@ def get_products_by_category(category_id):
 @product_bp.route('/get_items_by_product/<string:product_id>', methods=['GET'])
 def get_items_by_product_id(product_id):
     try:
-        # Fetch the product by its ID
-        product = Product.query.filter_by(p_id=product_id).first()
+        product = Product.query.options(joinedload(Product.product_items)).filter_by(p_id=product_id).first()
         if not product:
             return jsonify({"error": "Product not found"}), 404
 
-
-        items_data=[
-            {'i_id':item.i_id,'name':item.name,'image_url':item.image_url,'price':item.price} for item in product.product_items
+        # Fetch linked items using explicit join
+        items_data = [
+            {'i_id': item.i_id, 'name': item.name, 'image_url': item.image_url, 'price': item.price}
+            for item in product.product_items
         ]
 
         return jsonify({
             "product_id": product.p_id,
             "product_name": product.name,
-            "items_data":items_data
+            "items_data": items_data
         }), 200
 
     except Exception as e:
@@ -323,7 +256,7 @@ def search_products():
             "name": p.name,
             "Type": p.Type,
             "discount": p.discount,
-        } for p in products]
+        } for p in products if p.is_active]
     return jsonify(result), 200
 
 
@@ -392,74 +325,59 @@ def get_products_by_gender():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-from flask import Flask, jsonify, request
 
 
-@product_bp.route('/get_items_by_productlist/<product_id>', methods=['POST'])
-def item_from_product(product_id):
+@product_bp.route('/get_items_by_productlist', methods=['POST'])
+def item_from_product():
     """
-    Retrieve items for a specific product and its related categories.
+    Retrieve all product items linked to a list of products, including their sub-products.
     """
     try:
-        # Log request headers and body
-        print("Request Headers:", request.headers)
-        print(f"Request Body: {request.get_data(as_text=True)}")  # Raw body data
-
-        # Parse the request body
+        # Validate request
         if not request.is_json:
             return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
 
-        data = request.get_json() 
+        data = request.get_json()
         product_ids = data.get('product_ids', [])
-        
-        print(f"Received product IDs: {product_ids}")
 
         if not product_ids:
             return jsonify({'error': 'No product IDs provided'}), 400
 
-        # Fetch all products matching the given IDs
-        products = Product.query.filter(Product.p_id.in_(product_ids)).all()
-        if not products:
-            return jsonify({'error': 'No products found for the given IDs'}), 404
+        # Recursive CTE query to get all products and their sub-products
+        query = text("""
+            WITH RECURSIVE product_tree AS (
+                SELECT p_id, parent_id FROM products WHERE p_id = ANY(:product_ids)
+                UNION
+                SELECT p.p_id, p.parent_id FROM products p
+                INNER JOIN product_tree pt ON p.parent_id = pt.p_id
+            )
+            SELECT p_id FROM product_tree;
+        """)
 
-        # Collect all unique categories for the products
-        categories = {product.category for product in products if product.category}
-        print(f"Unique categories: {[cat.name for cat in categories]}")
-        
-        category_ids = [cat.c_id for cat in categories]
+        result = db.session.execute(query, {"product_ids": product_ids})
+        all_product_ids = [row[0] for row in result.fetchall()]
 
-        new_category_ids=Cat.get_all_subcategories(category_ids)
-        category_ids+=new_category_ids
+        if not all_product_ids:
+            return jsonify({'error': 'No products found'}), 404
 
-        print(f"All categories (including subcategories): {category_ids}")
+        # Fetch product items in a single query
+        product_items = db.session.query(ProductItem).join(ProToItem).filter(
+            ProToItem.p_id.in_(all_product_ids)
+        ).all()
 
-        # Get IDs of all categories
+        # Prepare response
+        items_data = [item.to_small_dict() for item in product_items]
+        item_ids = [item.i_id for item in product_items]
 
-        # Fetch all products in these categories
-        products_in_categories = Product.query.filter(Product.c_id.in_(category_ids)).all()
-        print(f"Products in categories: {[prod.name for prod in products_in_categories]}")
-
-        # Collect all product items for the products in these categories
-        all_product_items = []
-        for prod in products_in_categories:
-            all_product_items.extend(prod.product_items)
-
-        # Prepare the response
-        items_data = [
-            item.to_small_dict()
-            for item in all_product_items
-        ]
-        item_ids=[item.i_id for item in all_product_items]
         return jsonify({
             "item_ids": item_ids,
-            "items_data" : items_data
+            "items_data": items_data
         }), 200
 
     except Exception as e:
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
-    
 
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):
@@ -471,37 +389,9 @@ def remove_product(product_id):
             return jsonify({"message": "Products are imutable"}), 200
         if not product :
             return jsonify({"error": "Product not found"}), 404
-        # Get the category ID of the product
-        category_id = product.c_id
-        # Fetch all subcategories recursively
-        def get_subcategories(category_id):
-            subcategories = Category.query.filter_by(pc_id=category_id).all()
-            subcategory_ids = [sub.c_id for sub in subcategories]
-            for sub in subcategories:
-                subcategory_ids.extend(get_subcategories(sub.c_id))
-            return subcategory_ids
 
-        subcategory_ids = get_subcategories(category_id)
-        all_category_ids = [category_id] + subcategory_ids
-
-        # Fetch all products in the category and its subcategories
-        products_to_remove = Product.query.filter(Product.c_id.in_(all_category_ids)).all()
-
-        # Collect all product IDs to delete associated product_to_items entries
-        product_ids = [prod.p_id for prod in products_to_remove]
-
-        # Delete all product_to_items entries associated with the products
-        ProToItem.query.filter(ProToItem.p_id.in_(product_ids)).delete(synchronize_session=False)
-
-        # Delete the products themselves
-        for prod in products_to_remove:
-            db.session.delete(prod)
-
-        categorys_to_remove = Category.query.filter(Category.c_id.in_(all_category_ids)).all()
-        for cat in categorys_to_remove:
-            db.session.delete(cat)
-
-        # Commit the changes
+        
+        db.session.delete(product)
         db.session.commit()
 
         return jsonify({"message": "Products and related entries removed successfully"}), 200

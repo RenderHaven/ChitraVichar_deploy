@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, Category, Variation, VariationOption ,ProductItem ,ProductItemVariation
+from models import db, Variation, VariationOption ,ProductItem ,ProductItemVariation
 from sqlalchemy.exc import IntegrityError
 
 variation_bp = Blueprint('variation_bp', __name__)
@@ -222,7 +222,7 @@ def edit_variation(variation_id):
             db.session.delete(existing_options[opt_id])
 
         db.session.commit()
-        return jsonify({"message": "Variation updated successfully"}), 200
+        return jsonify({"message": "Variation updated successfully","data":variation.to_dict()}), 200
 
     except Exception as e:
         print(e)

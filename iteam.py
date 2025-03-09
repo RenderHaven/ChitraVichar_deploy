@@ -163,7 +163,7 @@ def remove_item(item_id):
         if not item:
             return jsonify({"error": "Item not found"}), 404
 
-        ProToItem.query.filter_by(i_id=item_id).delete()
+        # ProToItem.query.filter_by(i_id=item_id).delete()
         db.session.delete(item)
         db.session.commit()
 

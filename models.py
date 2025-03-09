@@ -20,45 +20,52 @@ class Description(db.Model):
             "tag_name": self.tag_name,  # Include the tag name in the serialized data
         }
     
-class Category(db.Model):
-    __tablename__ = 'categories'
+# class Category(db.Model):
+#     __tablename__ = 'categories'
 
-    c_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    pc_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=True)
-    name = db.Column(db.String(200), nullable=False)
+#     c_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+#     pc_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=True)
+#     name = db.Column(db.String(200), nullable=False)
 
-    subcategories = relationship("Category", backref="parent", remote_side=[c_id])
-    products = relationship("Product", back_populates="category")
+#     subcategories = relationship("Category", backref="parent", remote_side=[c_id])
+#     products = relationship("Product", back_populates="category")
 
-    def to_dict(self):
-        return {
-            "c_id": self.c_id,
-            "pc_id": self.pc_id,
-            "name": self.name,
-            "products_names": [product.name for product in self.products],
-        }
+#     def to_dict(self):
+#         return {
+#             "c_id": self.c_id,
+#             "pc_id": self.pc_id,
+#             "name": self.name,
+#             "products_names": [product.name for product in self.products],
+#         }
 
 
 class Product(db.Model):
     __tablename__ = 'products'
 
     p_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    parent_id = db.Column(db.String(36), db.ForeignKey('products.p_id', ondelete="CASCADE"), nullable=True) 
     name = db.Column(db.String(200), nullable=False)
     disc_id = db.Column(db.String(36), ForeignKey('descriptions.id'), nullable=True)  # Reference to Description
     image_url = db.Column(db.String(500))
-    c_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=False)
-    is_active = db.Column(db.Boolean, default=True)  # Boolean column
-    is_new = db.Column(db.Boolean, default=True)  # Boolean column
-    category = relationship("Category", back_populates="products")
-    description = relationship("Description", backref="products")  # Relationship with Description table
+    # c_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=False)
     Type = db.Column(db.String(200), nullable=False, default="Other")
     discount = db.Column(db.Float, nullable=False, default=0.0)
+    is_active = db.Column(db.Boolean, default=True)  # Boolean column
+    is_new = db.Column(db.Boolean, default=True)  # Boolean column
+    # category = relationship("Category", back_populates="products")
+    description = relationship("Description", backref="products")  # Relationship with Description table
     product_items = relationship('ProductItem', secondary='product_to_items', back_populates="products")
+
+    sub_products = db.relationship(
+        "Product",
+        cascade="all, delete-orphan",  # Automatically delete sub-products when parent is deleted
+        backref=db.backref("parent", remote_side=[p_id])
+    )
 
     def to_dict(self):
         return {
             "p_id": self.p_id,
-            "c_id" :self.c_id,
+            "c_id" :self.parent_id,
             "name": self.name,
             # "description": self.description.content if self.description else None,  # Use the Description relation
             # "tag_name": self.description.tag_name if self.description else None,
@@ -73,10 +80,11 @@ class Product(db.Model):
     def to_small_dict(self):
         return {
             "p_id": self.p_id,
-            "c_id" :self.c_id,
+            "c_id" :self.parent_id,
             "name": self.name,
-            "description": self.description.content if self.description else None,  # Use the Description relation
-            "tag_name": self.description.tag_name if self.description else None,
+            "image_url": self.image_url,
+            # "description": self.description.content if self.description else None,  # Use the Description relation
+            # "tag_name": self.description.tag_name if self.description else None,
             "Type": self.Type,
             "discount": self.discount,
             "is_active": self.is_active,
@@ -206,8 +214,8 @@ class ProToItem(db.Model):
     __tablename__ = 'product_to_items'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    p_id = db.Column(db.String(36), ForeignKey('products.p_id'), nullable=False)
-    i_id = db.Column(db.String(36), ForeignKey('product_items.i_id'), nullable=False)
+    p_id = db.Column(db.String(36),ForeignKey('products.p_id',ondelete="CASCADE"), nullable=False)
+    i_id = db.Column(db.String(36), ForeignKey('product_items.i_id',ondelete="CASCADE"),nullable=False)
 
 
 class Variation(db.Model):
@@ -251,8 +259,8 @@ class ProductItemVariation(db.Model):
     __tablename__ = 'product_item_variations'
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    product_item_id = db.Column(db.String(36), ForeignKey('product_items.i_id'), nullable=False)
-    variation_option_id = db.Column(db.String(36), ForeignKey('variation_options.id'), nullable=False)
+    product_item_id = db.Column(db.String(36), ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)
+    variation_option_id = db.Column(db.String(36), ForeignKey('variation_options.id',ondelete="CASCADE"),nullable=False)
 
     product_item = relationship("ProductItem", back_populates="variations")
     variation_option = relationship("VariationOption", back_populates="product_items")
@@ -276,9 +284,11 @@ class User(db.Model):
     dob= db.Column(db.String(50), nullable=True)
     gender= db.Column(db.String(50), nullable=True)
     number = db.Column(db.String(15), unique=True, nullable=False)
+
     password = db.Column(db.String(255), nullable=False,default='123456')
-    addresses = db.relationship('Address', backref='user', lazy='select')
-    orders = db.relationship('Order', backref='user', lazy='select') 
+    addresses = db.relationship('Address', backref='user', lazy='select',cascade="all, delete-orphan")
+    orders = db.relationship('Order', backref='user', lazy='select',cascade="all, delete-orphan") 
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -296,7 +306,7 @@ class User(db.Model):
 
 class Address(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)
     street = db.Column(db.String(255), nullable=False)
     city = db.Column(db.String(100), nullable=False)
     state = db.Column(db.String(100), nullable=False)
@@ -316,8 +326,8 @@ class Cart(db.Model):
     __tablename__ = 'cart'
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)  # Reference to User
-    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=False)  # Reference to ProductItem
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)  # Reference to User
+    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)  # Reference to ProductItem
 
     
     
@@ -372,7 +382,7 @@ class ImgItem(db.Model):
     __tablename__ = 'img_items'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    item_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=False)
+    item_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)
     image_url = db.Column(db.String(500), nullable=False)
 
     product_item = relationship("ProductItem", backref=db.backref("images", cascade="all, delete-orphan"))

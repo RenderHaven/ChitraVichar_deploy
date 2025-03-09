@@ -1,4 +1,4 @@
-from models import db, Product, Category,Variation,VariationOption,User
+from models import db, Product,Variation,VariationOption,User
 from app import app
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -7,22 +7,17 @@ product_data = {
     "Pro1": {
         "PId": 'Home',
         "name": "Home",
-        "CId": 'Home',  # Link this product to the "Home" category
+        "CId": None,  # Link this product to the "Home" category
     },
     "Pro2": {
         "PId": 'Pro',
-        "name": "promotion",
-        "CId": 'Pro',  # Link this product to the "Home" category
-    },
-    "Pro3": {
-        "PId": 'New',
-        "name": "New Collection",
-        "CId": 'New',  # Link this product to the "Home" category
+        "name": "Promotion",
+        "CId": None,  # Link this product to the "Home" category
     },
     "Pro4": {
         "PId": 'Test',
         "name": "Testing",
-        "CId": 'Test',  # Link this product to the "Home" category
+        "CId": 'Home',  # Link this product to the "Home" category
     },
 }
 
@@ -49,7 +44,7 @@ category_data = {
         "name": "NewProducts",
     },
     "Cat5": {
-        "CId": 'Test',
+        "CId": 'Home',
         "PId": 'Home',  # Parent ID is 'Cat1'
         "name": "Testing",
     },
@@ -58,7 +53,7 @@ category_data = {
 variation_data = {
     "Cat1": {
         "name": "Discount",
-        "options":['10']
+        "options":['10','20']
     },
     "Cat2": {
         "name": "Size",
@@ -66,7 +61,7 @@ variation_data = {
     },
     "Cat3": {
         "name": "Color",
-        "options":['Black','Red','Blue']
+        "options":['Black','Red','Blue','White']
     },
 }
 
@@ -75,20 +70,20 @@ def insert_data():
     db.create_all()
 
     # Insert categories
-    for id, info in category_data.items():
-        new_category = Category(
-            c_id=info['CId'],
-            pc_id=info['PId'],  # Parent category ID
-            name=info['name'],
-        )
-        db.session.add(new_category)
+    # for id, info in category_data.items():
+    #     new_category = Category(
+    #         c_id=info['CId'],
+    #         pc_id=info['PId'],  # Parent category ID
+    #         name=info['name'],
+    #     )
+    #     db.session.add(new_category)
 
     # Insert products
     for id, info in product_data.items():
         new_product = Product(
             p_id=info['PId'],
             name=info['name'],
-            c_id=info['CId'],  # Assign the category ID
+            parent_id=info['CId'],  # Assign the category ID
         )
         db.session.add(new_product)
 
@@ -119,6 +114,7 @@ def insert_data():
 
 if __name__ == '__main__':
     with app.app_context():
+        print("Database Path:", db.engine.url.database)
         db.drop_all()  # Drops all tables to start fresh
         db.create_all()  # Re-creates the tables
         insert_data()  # Inserts the sample data
