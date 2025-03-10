@@ -40520,7 +40520,7 @@ n=A.b(B.d.eX(q.f.a.a).split(","),o)
 m=A.b(B.d.eX(q.e.a.a).split(","),o)
 l=A.cm("https://chitravichar-deploy.onrender.com/variation/add_variation")
 o=t.N
-k=A.Z(["Content-Type","application/json"],o,o)
+k=A.Z(["Content-Type","application/json","X-API-KEY","<@pap@a123>"],o,o)
 s=2
 return A.J(A.oa(l,B.ac.fQ(A.Z(["name",p,"options",n,"discs",m],o,t.K)),k),$async$vR)
 case 2:j=b
