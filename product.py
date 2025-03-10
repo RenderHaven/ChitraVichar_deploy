@@ -1,17 +1,11 @@
 from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, Description
-import uuid
-import base64
-import cloudinary
-import cloudinary.uploader
 import category as Cat
 from sqlalchemy import or_,text,and_
 from sqlalchemy.orm import joinedload
 import config
 # Create the Blueprint
 product_bp = Blueprint('product', __name__)
-
-
 
 @product_bp.route('/add_product', methods=['POST'])
 def add_product():
@@ -145,12 +139,12 @@ def upload_product_image():
 
         # Upload image to Cloudinary
         image_url=config.uploadImg(base64_image)
-
+        print(image_url)
         # Update product image_url
         product.image_url = image_url
         db.session.commit()
 
-        return jsonify({"message": "Image uploaded successfully", "image_url": image_url}), 200
+        return jsonify({"message": "Image uploaded successfully", "image_url": image_url}), 201
 
     except Exception as e:
         db.session.rollback()

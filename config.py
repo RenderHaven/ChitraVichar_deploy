@@ -3,10 +3,11 @@ import os
 from flask import Flask, request, jsonify
 import base64
 import cloudinary
+import cloudinary.uploader
 cloudinary.config(
-    cloud_name="dimdoq0ng",
-    api_key="324659127373814",
-    api_secret="eUTC_Jxfvw95dkaCDN7yHEomugE"
+    cloud_name="dlvg9hkax",
+    api_key="433946728882916",
+    api_secret="mSix-JVm0Y0rmxzNbkt3M2K-toE"
 )
 
 
@@ -17,6 +18,7 @@ def uploadImg(base64_image):
         upload_result = cloudinary.uploader.upload(file_to_upload)
         return upload_result.get('secure_url')
     except Exception as e:
+        print(e)
         return None
     
 

@@ -51,7 +51,7 @@ class Product(db.Model):
     Type = db.Column(db.String(200), nullable=False, default="Other")
     discount = db.Column(db.Float, nullable=False, default=0.0)
     is_active = db.Column(db.Boolean, default=True)  # Boolean column
-    is_new = db.Column(db.Boolean, default=True)  # Boolean column
+    is_new = db.Column(db.Boolean, default=False)  # Boolean column
     # category = relationship("Category", back_populates="products")
     description = relationship("Description", backref="products")  # Relationship with Description table
     product_items = relationship('ProductItem', secondary='product_to_items', back_populates="products")
@@ -108,63 +108,54 @@ class ProductItem(db.Model):
     orders = db.relationship('Order', backref='item', lazy=True)
     carts = db.relationship('Cart', backref='item', lazy=True,cascade="all, delete-orphan")
 
-    def _get_max_discount(self):
-        """ Helper function to calculate the maximum discount from variations and products """
-        max_discount = 0.0
-
-        for variation in self.variations:
-            option = variation.variation_option
-            if option:
-                variation_dict = option.to_dict()
-                if variation_dict.get('variation_name') == "Discount":
-                    value = variation_dict.get('value', '')
-                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
-                        max_discount = max(max_discount, float(value))
-
-        for product in self.products:
-            if isinstance(product.discount, (int, float)):
-                max_discount = max(max_discount, float(product.discount))
-        print("cddc")
-        return max_discount
     
     def _group_variation_data(self):
-        grouped_data = defaultdict(lambda: {"variation_name": None, "options": []})
-        max_discount = 0.0  # Store max discount separately
+        grouped_data = defaultdict(lambda: {"variation_name": "", "options": []})
+        max_discount = 0.0  
+        my_options = []
 
+        # Collect products and calculate max_discount
+        products = [{"name": p.name, "p_id": p.p_id} for p in self.products]
+        max_discount = max(
+            (float(p.discount) for p in self.products if isinstance(p.discount, (int, float))),
+            default=0.0
+        )
+
+        # Process variations
         for var in self.variations:
             item = var.variation_option.to_dict()
             variation_id = item["variation_id"]
-            
-            # Set variation_name once per variation_id
-            if grouped_data[variation_id]["variation_name"] is None:
-                grouped_data[variation_id]["variation_name"] = item["variation_name"]
+            my_options.append(item["id"])
 
-            # Add option details
+            # Set variation name once
+            grouped_data[variation_id]["variation_name"] = item["variation_name"]
             grouped_data[variation_id]["options"].append({
                 "id": item["id"],
                 "value": item["value"]
             })
 
-            # Compute max discount separately
+            # Compute max discount for Discount variations
             if item.get("variation_name") == "Discount":
-                value = item.get("value", "")
-                if isinstance(value, (int, float)) or (isinstance(value, str) and value.replace('.', '', 1).isdigit()):
-                    max_discount = max(max_discount, float(value))
+                try:
+                    value = float(item["value"])
+                    max_discount = max(max_discount, value)
+                except (ValueError, TypeError):
+                    pass  # Ignore non-numeric values
 
-        # Convert dictionary to list format
-        result = [
-            {
-                "variation_id": var_id,
-                "variation_name": data["variation_name"],
-                "options": data["options"]
-            }
-            for var_id, data in grouped_data.items()
-        ]
+            # Convert to list format
+            result = [
+                {
+                    "variation_id": var_id,
+                    "variation_name": data["variation_name"],
+                    "options": data["options"]
+                }
+                for var_id, data in grouped_data.items()
+            ]
 
-        return result, max_discount   # Return both variations and discount separately
+        return result, max_discount, my_options, products
         
     def to_dict(self):
-        grouped_variations, max_discount = self._group_variation_data()
+        grouped_variations, max_discount,my_options,products = self._group_variation_data()
 
         return {
             "i_id": self.i_id,
@@ -175,24 +166,22 @@ class ProductItem(db.Model):
             "tag_name": self.description.tag_name if self.description else None,
             "disc_id": self.description.id if self.description else None,
             "stock_quantity": self.stock_quantity,
-            "products_id": [product.p_id for product in self.products],
             "images": [image.to_dict() for image in self.images],
-            "products": [{'name': product.name, 'p_id': product.p_id} for product in self.products],
+            "products": products,
             "variations": grouped_variations,
             "discount": max_discount,
         }
 
     def to_small_dict(self):
-        grouped_variations, max_discount = self._group_variation_data()
-        print(self._group_variation_data())
+        # grouped_variations, max_discount = self._group_variation_data()
+        # print(self._group_variation_data())
         return {
             "i_id": self.i_id,
             "name": self.name,
             "image_url": self.image_url,
             "price": self.price,
-            "variations": grouped_variations,
             "my_options":[variation.variation_option.id for variation in self.variations if variation.variation_option],  #localfilter
-            "discount": max_discount,
+            # "discount": max_discount,
         }
     
     def to_cart_dict(self):
@@ -239,6 +228,7 @@ class VariationOption(db.Model):
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     variation_id = db.Column(db.String(36), ForeignKey('variations.id'), nullable=False)
+    variation_name = db.Column(db.String(200), nullable=False)
     value = db.Column(db.String(200), nullable=False)
     disc = db.Column(db.String(300), nullable=True)  
     variation = relationship("Variation", back_populates="options")
@@ -249,7 +239,7 @@ class VariationOption(db.Model):
             "id": self.id,
             "variation_id": self.variation_id,
             "value": self.value,
-            "variation_name": self.variation.name if self.variation else None,
+            "variation_name": self.variation_name,
             'disc':self.disc,
         }
 

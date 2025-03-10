@@ -20,7 +20,6 @@ product_data = {
         "CId": 'Home',  # Link this product to the "Home" category
     },
 }
-
 # Sample category data
 category_data = {
     "Cat1": {
@@ -97,20 +96,9 @@ def insert_data():
         db.session.add(variation)
         db.session.commit()
         for option_value in info['options']:
-            option = VariationOption(value=option_value, variation_id=variation.id)
+            option = VariationOption(value=option_value, variation_id=variation.id,variation_name=info['name'])
             db.session.add(option)
         db.session.commit()
-    # user = User(
-    #     id='User1',
-    #     name='Vikram',
-    #     number='+919461373630',
-    #     email='vikrambalai1002@gmail.com',
-    #     last_name='Balai',
-    #     gender='Male',
-    #     password=generate_password_hash('1234567890', method='pbkdf2:sha256')
-    # )
-    # db.session.add(user)
-    # db.session.commit()
 
 if __name__ == '__main__':
     with app.app_context():

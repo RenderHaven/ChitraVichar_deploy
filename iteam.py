@@ -2,18 +2,10 @@ from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, ProductItemVariation,Description,ImgItem
 import uuid
 import base64
-import cloudinary
-import cloudinary.uploader
-
+import config
 # Create the Blueprint for handling product items
 item_bp = Blueprint('item', __name__)
 
-# Configure Cloudinary
-cloudinary.config(
-    cloud_name="dimdoq0ng",
-    api_key="324659127373814",
-    api_secret="eUTC_Jxfvw95dkaCDN7yHEomugE"
-)
 
 @item_bp.route('/add_item', methods=['POST'])
 def add_item():
@@ -308,10 +300,7 @@ def upload_item_images():
         uploaded_urls = []
         for base64_image in base64_images:
             try:
-                file_to_upload = base64.b64decode(base64_image)
-                upload_result = cloudinary.uploader.upload(file_to_upload)
-                image_url = upload_result.get('secure_url')
-
+                image_url = config.uploadImg(base64_image)
                 # Save image URL to ImgItem table
                 new_img_item = ImgItem(item_id=item_id, image_url=image_url)
                 db.session.add(new_img_item)
