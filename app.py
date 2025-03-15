@@ -23,7 +23,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Convert DATABASE_URL (Fix for PostgreSQL URL issues)
-database_url = os.getenv("DATABASE_URL")  #"postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx"
+database_url = os.getenv("DATABASE_URL",'postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx')  #"postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx"
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 

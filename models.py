@@ -20,24 +20,6 @@ class Description(db.Model):
             "tag_name": self.tag_name,  # Include the tag name in the serialized data
         }
     
-# class Category(db.Model):
-#     __tablename__ = 'categories'
-
-#     c_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-#     pc_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=True)
-#     name = db.Column(db.String(200), nullable=False)
-
-#     subcategories = relationship("Category", backref="parent", remote_side=[c_id])
-#     products = relationship("Product", back_populates="category")
-
-#     def to_dict(self):
-#         return {
-#             "c_id": self.c_id,
-#             "pc_id": self.pc_id,
-#             "name": self.name,
-#             "products_names": [product.name for product in self.products],
-#         }
-
 
 class Product(db.Model):
     __tablename__ = 'products'
@@ -83,8 +65,6 @@ class Product(db.Model):
             "c_id" :self.parent_id,
             "name": self.name,
             "image_url": self.image_url,
-            # "description": self.description.content if self.description else None,  # Use the Description relation
-            # "tag_name": self.description.tag_name if self.description else None,
             "Type": self.Type,
             "discount": self.discount,
             "is_active": self.is_active,
@@ -101,48 +81,42 @@ class ProductItem(db.Model):
     price = db.Column(db.Float, nullable=False, default=0.0)
     disc_id = db.Column(db.String(36), ForeignKey('descriptions.id'), nullable=True)  # Reference to Description
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
-
+    discount = db.Column(db.Float, nullable=False, default=0.0)
     description = relationship("Description", backref="product_items")  # Relationship with Description table
-    products = relationship('Product', secondary='product_to_items', back_populates="product_items")
-    variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan")
-    orders = db.relationship('Order', backref='item', lazy=True)
-    carts = db.relationship('Cart', backref='item', lazy=True,cascade="all, delete-orphan")
+    products = relationship('Product', secondary='product_to_items', back_populates="product_items",lazy='select')
+    variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan",lazy='select')
+    orders = db.relationship('Order', backref='item', lazy='select')
+    carts = db.relationship('Cart', backref='item', lazy='select',cascade="all, delete-orphan")
 
     
-    def _group_variation_data(self):
+    def _group_variation_data(self,all=True):
         grouped_data = defaultdict(lambda: {"variation_name": "", "options": []})
-        max_discount = 0.0  
-        my_options = []
+        
+        # Process products and variations in one loop for efficiency
+        products = []
+        my_options=[]
+        max_discount = self.discount
+        
+        for product in self.products:
+            products.append({"name": product.name, "p_id": product.p_id})
+            if isinstance(product.discount, (int, float)):
+                max_discount = max(max_discount, float(product.discount))
 
-        # Collect products and calculate max_discount
-        products = [{"name": p.name, "p_id": p.p_id} for p in self.products]
-        max_discount = max(
-            (float(p.discount) for p in self.products if isinstance(p.discount, (int, float))),
-            default=0.0
-        )
-
-        # Process variations
+        result = []
         for var in self.variations:
-            item = var.variation_option.to_dict()
-            variation_id = item["variation_id"]
-            my_options.append(item["id"])
+            my_options.append(var.variation_option_id)
+            if(all):
+                item = var.variation_option.to_dict()
+                variation_id = item["variation_id"]
 
-            # Set variation name once
-            grouped_data[variation_id]["variation_name"] = item["variation_name"]
-            grouped_data[variation_id]["options"].append({
-                "id": item["id"],
-                "value": item["value"]
-            })
+                grouped_data[variation_id]["variation_name"] = item["variation_name"]
+                grouped_data[variation_id]["options"].append({
+                    "id": item["id"],
+                    "value": item["value"]
+                })
 
-            # Compute max discount for Discount variations
-            if item.get("variation_name") == "Discount":
-                try:
-                    value = float(item["value"])
-                    max_discount = max(max_discount, value)
-                except (ValueError, TypeError):
-                    pass  # Ignore non-numeric values
-
-            # Convert to list format
+        # Final result conversion in a separate loop for clarity
+        if all:
             result = [
                 {
                     "variation_id": var_id,
@@ -152,7 +126,8 @@ class ProductItem(db.Model):
                 for var_id, data in grouped_data.items()
             ]
 
-        return result, max_discount, my_options, products
+        return result, max_discount,my_options, products
+
         
     def to_dict(self):
         grouped_variations, max_discount,my_options,products = self._group_variation_data()
@@ -173,20 +148,25 @@ class ProductItem(db.Model):
         }
 
     def to_small_dict(self):
-        # grouped_variations, max_discount = self._group_variation_data()
-        # print(self._group_variation_data())
+        grouped_variations, max_discount,my_options,products = self._group_variation_data(all=False)
         return {
             "i_id": self.i_id,
             "name": self.name,
             "image_url": self.image_url,
             "price": self.price,
-            "my_options":[variation.variation_option.id for variation in self.variations if variation.variation_option],  #localfilter
-            # "discount": max_discount,
+            "my_options":my_options, 
+            "discount": max_discount,
         }
     
+    def to_search_dict(self):
+        return {
+            "i_id": self.i_id,
+            "name": self.name,
+            "image_url": self.image_url,
+            "price": self.price,
+        }
     def to_cart_dict(self):
         grouped_variations, max_discount = self._group_variation_data()
-
         return {
             "i_id": self.i_id,
             "name": self.name,
@@ -195,7 +175,6 @@ class ProductItem(db.Model):
             "variations": grouped_variations,
             "discount": max_discount,
         }
-
 
 
 
@@ -252,16 +231,16 @@ class ProductItemVariation(db.Model):
     product_item_id = db.Column(db.String(36), ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)
     variation_option_id = db.Column(db.String(36), ForeignKey('variation_options.id',ondelete="CASCADE"),nullable=False)
 
-    product_item = relationship("ProductItem", back_populates="variations")
-    variation_option = relationship("VariationOption", back_populates="product_items")
+    product_item = relationship("ProductItem", back_populates="variations",lazy='select')
+    variation_option = relationship("VariationOption", back_populates="product_items",lazy='select')
 
     def to_dict(self):
         return {
             "id": self.id,
             "product_item_id": self.product_item_id,
             "variation_option_id": self.variation_option_id,
-            "product_item": self.product_item.to_dict() if self.product_item else None,
-            "variation_option": self.variation_option.to_dict() if self.variation_option else None,
+            # "product_item": self.product_item.to_dict() if self.product_item else None,
+            # "variation_option": self.variation_option.to_dict() if self.variation_option else None,
         }
 
 

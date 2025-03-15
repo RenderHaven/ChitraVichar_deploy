@@ -17,6 +17,7 @@ def add_item():
         product_id = data.get('product_id')
         item_name = data.get('name')
         price = data.get('price')
+        discount= data.get('discount',0)
         description_content = data.get('description', None)
         quantity_in_stock = data.get('stock_quantity')
         variation_value_ids = data.get('variation_value_ids', [])
@@ -32,7 +33,8 @@ def add_item():
             name=item_name,
             price=price,
             stock_quantity=quantity_in_stock,
-            image_url=image_url
+            image_url=image_url,
+            discount=discount
         )
         db.session.add(new_item)
         db.session.commit()
@@ -97,6 +99,7 @@ def edit_item():
         item_id = data.get('item_id')
         item_name = data.get('name')
         price = data.get('price')
+        discount= data.get('discount')
         quantity_in_stock = data.get('stock_quantity')
         description_content = data.get('description', '')
         variation_value_ids = data.get('variation_value_ids', [])
@@ -116,7 +119,8 @@ def edit_item():
         existing_item.name = item_name
         existing_item.price = price
         existing_item.stock_quantity = quantity_in_stock
-
+        if discount:existing_item.discount=discount
+        print(discount)
         # Update description
         if disc_id:
             existing_description = Description.query.get(disc_id)
@@ -226,11 +230,7 @@ def search_items():
                 (ProductItem.name.ilike(f"%{query}%"))
             ).all()
 
-        search_results = [{
-            "i_id": item.i_id,
-            "name": item.name,
-            "price": item.price,
-        } for item in items]
+        search_results = [item.to_search_dict() for item in items]
 
         return jsonify(search_results), 200
 
@@ -271,7 +271,7 @@ def get_items():
 
         result = []
         for item in items:
-            result.append(item.to_small_dict())
+            result.append(item.to_search_dict())
 
         return jsonify(result), 200
 
@@ -354,9 +354,7 @@ def edit_item_images():
             if image_id == "None":  # Upload new image to Cloudinary
                 try:
                     # Decode and upload the base64 image
-                    file_to_upload = base64.b64decode(image_url)
-                    upload_result = cloudinary.uploader.upload(file_to_upload)
-                    uploaded_url = upload_result.get('secure_url')
+                    uploaded_url = config.uploadImg(image_url)
 
                     # Save new image in the database
                     new_img_item = ImgItem(item_id=item_id, image_url=uploaded_url)

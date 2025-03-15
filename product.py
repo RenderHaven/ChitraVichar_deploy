@@ -191,19 +191,12 @@ def get_products_by_category(c_id):
             ).all()
 
         if not all_products:
-            return jsonify({"message": "No products found for this category"}), 200
+            return jsonify({"message": "No products found for this category"}), 401
 
-        # Extract product details
-        product_ids = []
         products_data = []
         for product in all_products:
-            product_ids.append(product.p_id)
             products_data.append(product.to_small_dict())
-        return jsonify({
-            "category_id": c_id,
-            "product_ids": product_ids,
-            "products_data":products_data
-        }), 200
+        return jsonify(products_data), 200
     
 
     except Exception as e:
@@ -225,11 +218,7 @@ def get_items_by_product_id(product_id):
             for item in product.product_items
         ]
 
-        return jsonify({
-            "product_id": product.p_id,
-            "product_name": product.name,
-            "items_data": items_data
-        }), 200
+        return jsonify(items_data), 200
 
     except Exception as e:
         print(e)
@@ -256,28 +245,28 @@ def search_products():
         } for p in products]
     return jsonify(result), 200
 
-@product_bp.route('/search_query', methods=['GET'])
-def search_products_byquery():
-    query = request.args.get('query', '').strip()
-    if len(query) < 3:
-        return jsonify({"error": "Search query must be at least 3 characters long"}), 400
+# @product_bp.route('/search_query', methods=['GET'])
+# def search_products_byquery():
+#     query = request.args.get('query', '').strip()
+#     if len(query) < 3:
+#         return jsonify({"error": "Search query must be at least 3 characters long"}), 400
     
         
 
-    # Search products by name (case-insensitive)
-    if g.is_valid_request:
-        products = Product.query.all()
-    else:
-        products = query.filter(Product.is_active == True).all()
+#     # Search products by name (case-insensitive)
+#     if g.is_valid_request:
+#         products = Product.query.all()
+#     else:
+#         products = query.filter(Product.is_active == True).all()
 
-    result = [{
-            "p_id": p.p_id,
-            "c_id" :p.parent_id,
-            "name": p.name,
-            "Type": p.Type,
-            "discount": p.discount,
-        } for p in products if p.is_active]
-    return jsonify(result), 200
+#     result = [{
+#             "p_id": p.p_id,
+#             "c_id" :p.parent_id,
+#             "name": p.name,
+#             "Type": p.Type,
+#             "discount": p.discount,
+#         } for p in products if p.is_active]
+#     return jsonify(result), 200
 
 
 @product_bp.route('/remove_item_from_product/<product_id>', methods=['POST'])
@@ -336,10 +325,42 @@ def get_products_by_gender():
         # Prepare product data
         data = [
             {
-                "product_id": product.p_id,
+                "p_id": product.p_id,
                 "name": product.name,
                 "image_url": product.image_url,
                 "type": product.Type
+            }
+            for product in all_products
+        ]
+
+        return jsonify(data), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@product_bp.route('/get_new_products/', methods=['GET'])
+def get_new_products():
+    """
+    Retrieves a list of products filtered by gender type (Man, Woman, UniSex).
+    """
+    try:
+        # Query subcategories based on the Type field
+        all_products = Product.query.filter(
+            and_(
+                Product.is_new==True,
+                Product.is_active==True,
+            )
+        ).all()
+
+        if not all_products:
+            return jsonify([]), 200
+
+        # Prepare product data
+        data = [
+            {
+                "p_id": product.p_id,
+                "name": product.name,
+                "image_url": product.image_url,
             }
             for product in all_products
         ]
@@ -391,12 +412,8 @@ def item_from_product():
 
         # Prepare response
         items_data = [item.to_small_dict() for item in product_items]
-        item_ids = [item.i_id for item in product_items]
 
-        return jsonify({
-            "item_ids": item_ids,
-            "items_data": items_data
-        }), 200
+        return jsonify(items_data), 200
 
     except Exception as e:
         db.session.rollback()

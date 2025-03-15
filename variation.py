@@ -34,7 +34,7 @@ def add_variation():
         # Add options (values) to the variation
         i=0
         for option_value in data['options']:
-            option = VariationOption(value=option_value,variation_name=variation.name, variation_id=variation.id,disc=data['discs'][i] if len(data['discs'])>i else None)
+            option = VariationOption(value=option_value,variation_name=data['name'], variation_id=variation.id,disc=data['discs'][i] if len(data['discs'])>i else None)
             db.session.add(option)
             i+=1
         db.session.commit()
