@@ -234,7 +234,7 @@ def search_products():
     if g.is_valid_request:
         products = Product.query.all()
     else:
-        products = Product.query.filter(Product.is_active == True).all()
+        products = Product.query.filter(Product.is_active == True,Product.parent_id!=None).all()
 
     result = [{
             "p_id": p.p_id,
