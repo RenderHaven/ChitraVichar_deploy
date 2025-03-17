@@ -359,7 +359,7 @@ def edit_item_images():
 
             if not image_url:
                 return jsonify({"error": "image_url is required for all images"}), 400
-            if image_id=='New':  # Upload new image to Cloudinary
+            if image_id=='New' or 'http' not in image_url:  # Upload new image to Cloudinary
                 try:
                     # Decode and upload the base64 image
                     uploaded_url = config.uploadImg(image_url)
