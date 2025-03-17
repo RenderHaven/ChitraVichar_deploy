@@ -97,6 +97,13 @@ def edit_item():
             return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         item_id = data.get('item_id')
+
+        if(item_id=='Lable'):
+            return jsonify({
+            "message": "Item updated successfully",
+            "item_id": item_id
+            }), 200
+        
         item_name = data.get('name')
         price = data.get('price')
         discount= data.get('discount')
@@ -161,6 +168,7 @@ def remove_item(item_id):
     try:
         if not g.is_valid_request:
             return jsonify({"error": "Unauthorized"}), 401
+        if(item_id=='Lable'):return jsonify({"error": "Not Allowed"}), 401
         item = ProductItem.query.get(item_id)
         if not item:
             return jsonify({"error": "Item not found"}), 404
@@ -246,6 +254,7 @@ def add_items_to_product(product_id):
         product = Product.query.get_or_404(product_id)
 
         for item_id in item_ids:
+            if(item_id=='Lable'):pass
             product_item = ProductItem.query.get(item_id)
             if product_item and product_item not in product.product_items:
                 product.product_items.append(product_item)
@@ -350,8 +359,7 @@ def edit_item_images():
 
             if not image_url:
                 return jsonify({"error": "image_url is required for all images"}), 400
-
-            if image_id == "None":  # Upload new image to Cloudinary
+            if image_id=='New':  # Upload new image to Cloudinary
                 try:
                     # Decode and upload the base64 image
                     uploaded_url = config.uploadImg(image_url)
@@ -378,6 +386,7 @@ def edit_item_images():
         }), 200
 
     except Exception as e:
+        print(e)
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 

@@ -14,7 +14,7 @@ cloudinary.config(
 
 def uploadImg(base64_image):
     try:
-        file_to_upload = base64.b64decode(base64_image)
+        file_to_upload = base64.b64decode(base64_image.split(',')[-1])
         upload_result = cloudinary.uploader.upload(file_to_upload)
         return upload_result.get('secure_url')
     except Exception as e:

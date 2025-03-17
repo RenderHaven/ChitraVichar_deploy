@@ -1,4 +1,5 @@
-from models import db, Product,Variation,VariationOption,User
+from models import db, Product,Variation,VariationOption,ProductItem,OrderItems,Order
+from sqlalchemy import text
 from app import app
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -14,39 +15,11 @@ product_data = {
         "name": "Promotion",
         "CId": None,  # Link this product to the "Home" category
     },
-    "Pro4": {
-        "PId": 'Test',
-        "name": "Testing",
-        "CId": 'Home',  # Link this product to the "Home" category
-    },
-}
-# Sample category data
-category_data = {
-    "Cat1": {
-        "CId": 'Cat1',
-        "PId": None,  # Parent ID is None for top-level categories
-        "name": "Base",
-    },
-    "Cat2": {
-        "CId": 'Home',
-        "PId": 'Cat1',  # Parent ID is 'Cat1'
-        "name": "HomePage",
-    },
-    "Cat3": {
-        "CId": 'Pro',
-        "PId": 'Cat1',  # Parent ID is 'Cat1'
-        "name": "Prmotions",
-    },
-    "Cat4": {
-        "CId": 'New',
-        "PId": 'Cat1',  # Parent ID is 'Cat1'
-        "name": "NewProducts",
-    },
-    "Cat5": {
-        "CId": 'Home',
-        "PId": 'Home',  # Parent ID is 'Cat1'
-        "name": "Testing",
-    },
+    # "Pro4": {
+    #     "PId": 'Test',
+    #     "name": "Testing",
+    #     "CId": 'Home',  # Link this product to the "Home" category
+    # },
 }
 
 variation_data = {
@@ -67,7 +40,13 @@ variation_data = {
 def insert_data():
     # Ensure the database schema exists
     db.create_all()
-
+    new_item = ProductItem(
+            i_id='Lable',
+            name='Lables',
+            image_url='dsd',
+        )
+    db.session.add(new_item)
+    db.session.commit()
     # Insert categories
     # for id, info in category_data.items():
     #     new_category = Category(
@@ -89,21 +68,23 @@ def insert_data():
     # Commit all changes to the database
     db.session.commit()
 
-    for id,info in variation_data.items():
-        variation = Variation(
-            name=info['name'],
-        )
-        db.session.add(variation)
-        db.session.commit()
-        for option_value in info['options']:
-            option = VariationOption(value=option_value, variation_id=variation.id,variation_name=info['name'])
-            db.session.add(option)
-        db.session.commit()
-
-if __name__ == '__main__':
+def update_all():
     with app.app_context():
         print("Database Path:", db.engine.url.database)
-        db.drop_all()  # Drops all tables to start fresh
-        db.create_all()  # Re-creates the tables
-        insert_data()  # Inserts the sample data
+
+        db.drop_all()
+        db.create_all()  # Rebuild tables after dropping
+        insert_data()    # Inserts the sample data
+
+    print("Data inserted successfully")
+
+def update_order():
+    with app.app_context():
+        print("Database Path:", db.engine.url.database)
+
+        # Drop only the Order and OrderItems tables
+        Order.__table__.drop(db.engine, checkfirst=True)
+        OrderItems.__table__.drop(db.engine, checkfirst=True)
+        db.create_all()  # Rebuild tables after dropping
+
     print("Data inserted successfully")

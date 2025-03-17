@@ -82,10 +82,11 @@ class ProductItem(db.Model):
     disc_id = db.Column(db.String(36), ForeignKey('descriptions.id'), nullable=True)  # Reference to Description
     stock_quantity = db.Column(db.Integer, nullable=False, default=0)
     discount = db.Column(db.Float, nullable=False, default=0.0)
+
     description = relationship("Description", backref="product_items")  # Relationship with Description table
     products = relationship('Product', secondary='product_to_items', back_populates="product_items",lazy='select')
     variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan",lazy='select')
-    orders = db.relationship('Order', backref='item', lazy='select')
+    # orders = db.relationship('Order', backref='item', cascade="all, delete-orphan")
     carts = db.relationship('Cart', backref='item', lazy='select',cascade="all, delete-orphan")
 
     
@@ -311,39 +312,53 @@ class Order(db.Model):
     __tablename__ = 'orders'
 
     o_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)  # Reference to User
-    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=False)  # Reference to ProductItem
-    address = db.Column(db.String(500), nullable=True)  # Store address as a string
-    status = db.Column(db.String(50), nullable=False, default='IN_CART')  # Status of the order
-    datetime = db.Column(db.DateTime, nullable=False, default=db.func.now())  # Timestamp for the order
-    short_note = db.Column(db.String(300), nullable=True)  
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False, index=True)
+    address = db.Column(db.String(500), nullable=True)
+    status = db.Column(db.Enum('IN_ORDER', 'SHIPPED', 'DELIVERED', 'CANCELLED', name='order_status'), 
+                       nullable=False, default='IN_ORDER')
+    datetime = db.Column(db.DateTime, nullable=False, default=db.func.now(), index=True)
+    short_note = db.Column(db.String(300), nullable=True)
     delivery_charge = db.Column(db.Integer, nullable=True)
-    total_price = db.Column(db.Integer, nullable=True)
-    oi_id = db.Column(db.String(36), db.ForeignKey('order_items.oi_id'), nullable=False)  # Reference to ProductItem
+    total_price = db.Column(db.Float, nullable=False)
+    
+    # Relationship to order items
+    order_items = db.relationship('OrderItems', backref='order',cascade="all, delete-orphan", lazy=True)
 
     def to_dict(self):
         return {
             "id": self.o_id,
             "user_id": self.user_id,
-            "i_id": self.i_id,
-            "address": self.address,  # Now storing the address directly as a string
-            "item_name": self.item.name if self.item else None,
-            "quantity": self.quantity,
+            "address": self.address,
             "status": self.status,
             "datetime": self.datetime.isoformat() if self.datetime else None,
-            "user": self.user.to_dict() if self.user else None,  # Include user information
+            "delivery_charge": self.delivery_charge,
+            "total_price": self.total_price,
+            "items": [item.to_dict() for item in self.order_items] if self.order_items else []
         }
-    
+
 class OrderItems(db.Model):
     __tablename__ = 'order_items'
+
     oi_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=True)  # Reference to ProductItem
+    order_id = db.Column(db.String(36), db.ForeignKey('orders.o_id',ondelete="CASCADE"), nullable=False)  # Link to Order
+    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id'), nullable=True)
     name = db.Column(db.String(200), nullable=False)
     image_url = db.Column(db.String(500))
     price = db.Column(db.Float, nullable=False, default=0.0)
     original_price = db.Column(db.Float, nullable=False, default=0.0)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    other_details = db.Column(db.Text, nullable=True)  
+    other_details = db.Column(db.Text, nullable=True)
+    product_item = db.relationship("ProductItem", backref="order_items", lazy='select')
+    def to_dict(self):
+        return {
+            "id": self.oi_id,
+            "name": self.name,
+            "image_url": self.image_url,
+            "price": self.price,
+            "original_price": self.original_price,
+            "quantity": self.quantity,
+            "other_details": self.other_details
+        }
     
     
 # New model for storing image URLs

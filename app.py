@@ -10,6 +10,7 @@ from models import db
 from users import user_bp
 from product import product_bp
 from iteam import item_bp
+from home import home_bp
 from variation import variation_bp
 from orders import orders_bp
 from disc import disc_bp
@@ -50,6 +51,7 @@ def before_request_func():
 # Register Blueprints
 app.register_blueprint(product_bp, url_prefix='/product')
 app.register_blueprint(item_bp, url_prefix='/item')
+app.register_blueprint(home_bp, url_prefix='/home')
 app.register_blueprint(user_bp, url_prefix='/user')
 app.register_blueprint(variation_bp, url_prefix='/variation')
 app.register_blueprint(disc_bp, url_prefix='/description')
