@@ -123,6 +123,7 @@ def get_user(user_id):
         return jsonify(user.to_dict()), 200
 
     except Exception as e:
+        print(e)
         return jsonify({'message': 'An error occurred while fetching userdata', 'error': str(e)}), 500
 
 # Edit an existing address

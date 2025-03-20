@@ -36,6 +36,7 @@ db.init_app(app)
 migrate = Migrate(app, db)
 
 
+
 @app.before_request
 def before_request_func():
     

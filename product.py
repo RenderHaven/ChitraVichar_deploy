@@ -282,8 +282,7 @@ def remove_item_from_product(product_id):
         data = request.get_json()
         item_id = data.get('item_id')
 
-        if not item_id:
-            return jsonify({'error': 'Item ID is required'}), 400
+        if not item_id:            return jsonify({'error': 'Item ID is required'}), 400
 
         # Find the product-item relationship
         product_item = ProToItem.query.filter_by(p_id=product_id, i_id=item_id).first()

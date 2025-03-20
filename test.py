@@ -82,9 +82,10 @@ def update_order():
     with app.app_context():
         print("Database Path:", db.engine.url.database)
 
-        # Drop only the Order and OrderItems tables
-        Order.__table__.drop(db.engine, checkfirst=True)
-        OrderItems.__table__.drop(db.engine, checkfirst=True)
-        db.create_all()  # Rebuild tables after dropping
+        # Drop tables with CASCADE to remove dependencies
+        with db.engine.connect() as conn:
+            conn.execute(text("DROP TABLE IF EXISTS order_items CASCADE"))
+            conn.execute(text("DROP TABLE IF EXISTS orders CASCADE"))
 
-    print("Data inserted successfully")
+        db.create_all()  # Rebuild tables after dropping
+        print("Data inserted successfully")

@@ -270,7 +270,7 @@ class User(db.Model):
             'gender':self.gender,
             'profile_picture':self.image_url,
             'my_addresses':[add.to_dict() for add in self.addresses],
-            # 'my_orders':[order.to_dict() for order in self.orders]
+            'my_orders':[order.to_small() for order in self.orders]
         }
 
 
@@ -314,16 +314,26 @@ class Order(db.Model):
     o_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False, index=True)
     address = db.Column(db.String(500), nullable=True)
-    status = db.Column(db.Enum('IN_ORDER', 'SHIPPED', 'DELIVERED', 'CANCELLED', name='order_status'), 
-                       nullable=False, default='IN_ORDER')
+    status = db.Column(db.Enum('IN_PROGRESS', 'SHIPPED', 'DELIVERED', 'CANCELLED', name='order_status'), 
+                       nullable=False, default='IN_PROGRESS')
     datetime = db.Column(db.DateTime, nullable=False, default=db.func.now(), index=True)
+    payINFO = db.Column(db.String(100), nullable=True)
     short_note = db.Column(db.String(300), nullable=True)
     delivery_charge = db.Column(db.Integer, nullable=True)
     total_price = db.Column(db.Float, nullable=False)
     
     # Relationship to order items
     order_items = db.relationship('OrderItems', backref='order',cascade="all, delete-orphan", lazy=True)
-
+    def to_small(self):
+        return {
+            "id": self.o_id,
+            "address": self.address,
+            "status": self.status,
+            "datetime": self.datetime.isoformat() if self.datetime else None,
+            "delivery_charge": self.delivery_charge,
+            "total_price": self.total_price,
+            # "items": [item.to_dict() for item in self.order_items] if self.order_items else []
+        }
     def to_dict(self):
         return {
             "id": self.o_id,
