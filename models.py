@@ -23,7 +23,6 @@ class Description(db.Model):
 
 class Product(db.Model):
     __tablename__ = 'products'
-
     p_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     parent_id = db.Column(db.String(36), db.ForeignKey('products.p_id', ondelete="CASCADE"), nullable=True) 
     name = db.Column(db.String(200), nullable=False)
@@ -43,6 +42,14 @@ class Product(db.Model):
         cascade="all, delete-orphan",  # Automatically delete sub-products when parent is deleted
         backref=db.backref("parent", remote_side=[p_id])
     )
+
+    @classmethod
+    def query_active(cls, active=True):
+        """Fetch only active products if active=True, else fetch all products."""
+        query = cls.query
+        if not active:
+            query = query.filter(cls.is_active == True)
+        return query.order_by(cls.name.asc())
 
     def to_dict(self):
         return {

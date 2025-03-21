@@ -115,6 +115,48 @@ def edit_product(product_id):
         print(e)
         return jsonify({"error": str(e)}), 500
 
+@product_bp.route('/move_product/<string:product_id>', methods=['PUT'])
+def move_product(product_id):
+    """
+    Edits an existing product, allowing updates to name, type, discount, is_active, and is_new.
+    """
+    try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+        # Parse request data
+        data = request.json
+        parent_productId=data.get('c_id')
+
+        # Find the product
+        product = Product.query.get_or_404(product_id)
+        parent_product = Product.query.get_or_404(parent_productId)
+        # Update the product fields only if new values are provided
+        if(parent_productId):
+            product.parent_id=parent_productId
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Product updated successfully",
+            "product": {
+                "p_id": product.p_id,
+                "name": product.name,
+                "type": product.Type,
+                "discount": product.discount,
+                "is_active": product.is_active,
+                "is_new": product.is_new
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+    
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({"error": str(e)}), 500
     
 @product_bp.route('/upload_product_image', methods=['POST'])
 def upload_product_image():
@@ -124,7 +166,6 @@ def upload_product_image():
     try:
         if not g.is_valid_request:
             return jsonify({"error": "Unauthorized"}), 401
-        
         data = request.json
         product_id = data.get('product_id')
         base64_image = data.get('display_img')
@@ -179,17 +220,8 @@ def get_products_by_category(c_id):
     """
     try:
         if(c_id=='null'):c_id=None
-        # Find the subcategories under the given category_id\
-        if g.is_valid_request:
-            all_products = Product.query.filter_by(parent_id=c_id).all()
-        else :
-            all_products = Product.query.filter(
-            and_(
-                Product.parent_id == c_id,
-                Product.is_active == True   # Inverts the boolean condition
-            )
-            ).all()
 
+        all_products = Product.query_active(g.get("is_valid_request", False)).filter_by(parent_id=c_id).all()
         if not all_products:
             return jsonify({"message": "No products found for this category"}), 401
 
@@ -198,7 +230,6 @@ def get_products_by_category(c_id):
             products_data.append(product.to_small_dict())
         return jsonify(products_data), 200
     
-
     except Exception as e:
         db.session.rollback()
         print(e)
@@ -208,7 +239,7 @@ def get_products_by_category(c_id):
 @product_bp.route('/get_items_by_product/<string:product_id>', methods=['GET'])
 def get_items_by_product_id(product_id):
     try:
-        product = Product.query.options(joinedload(Product.product_items)).filter_by(p_id=product_id).first()
+        product = Product.query_active(g.get("is_valid_request", False)).options(joinedload(Product.product_items)).filter_by(p_id=product_id).first()
         if not product:
             return jsonify({"error": "Product not found"}), 404
 
@@ -231,10 +262,7 @@ def search_products():
     if len(query) < 3:
         return jsonify({"error": "Search query must be at least 3 characters long"}), 400
     
-    if g.is_valid_request:
-        products = Product.query.all()
-    else:
-        products = Product.query.filter(Product.is_active == True,Product.parent_id!=None).all()
+    products = Product.query_active(g.get("is_valid_request", False)).all()
 
     result = [{
             "p_id": p.p_id,
@@ -275,14 +303,13 @@ def remove_item_from_product(product_id):
     Remove an item from a specific product.
     """
     try:
-        auth_error = config.verify_api_key()
-        if auth_error:
-            return auth_error
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
         
         data = request.get_json()
         item_id = data.get('item_id')
 
-        if not item_id:            return jsonify({'error': 'Item ID is required'}), 400
+        if not item_id:return jsonify({'error': 'Item ID is required'}), 400
 
         # Find the product-item relationship
         product_item = ProToItem.query.filter_by(p_id=product_id, i_id=item_id).first()
@@ -310,12 +337,12 @@ def get_products_by_gender():
     """
     try:
         # Query subcategories based on the Type field
-        all_products = Product.query.filter(
+        all_products = Product.query_active(g.get("is_valid_request", False)).filter(
             or_(
                 Product.Type == 'Man',
                 Product.Type == 'Women',
                 Product.Type == 'UniSex',
-            )
+            ),
         ).all()
 
         if not all_products:
@@ -344,12 +371,7 @@ def get_new_products():
     """
     try:
         # Query subcategories based on the Type field
-        all_products = Product.query.filter(
-            and_(
-                Product.is_new==True,
-                Product.is_active==True,
-            )
-        ).all()
+        all_products = Product.query_active(g.get("is_valid_request", False)).filter(Product.is_new==True,).all()
 
         if not all_products:
             return jsonify([]), 200
@@ -389,14 +411,16 @@ def item_from_product():
 
         # Recursive CTE query to get all products and their sub-products
         query = text("""
-            WITH RECURSIVE product_tree AS (
-                SELECT p_id, parent_id FROM products WHERE p_id = ANY(:product_ids)
-                UNION
-                SELECT p.p_id, p.parent_id FROM products p
-                INNER JOIN product_tree pt ON p.parent_id = pt.p_id
-            )
-            SELECT p_id FROM product_tree;
-        """)
+                WITH RECURSIVE product_tree AS (
+                    SELECT p_id, parent_id FROM products 
+                    WHERE p_id = ANY(:product_ids) AND is_active = TRUE
+                    UNION
+                    SELECT p.p_id, p.parent_id FROM products p
+                    INNER JOIN product_tree pt ON p.parent_id = pt.p_id
+                    WHERE p.is_active = TRUE
+                )
+                SELECT p_id FROM product_tree;
+            """)
 
         result = db.session.execute(query, {"product_ids": product_ids})
         all_product_ids = [row[0] for row in result.fetchall()]

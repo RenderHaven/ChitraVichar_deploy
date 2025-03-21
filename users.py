@@ -2,8 +2,32 @@ from flask import Blueprint, request, jsonify
 from models import db, User, Address,Cart
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import DatabaseError
+import config
 user_bp = Blueprint('user', __name__)
 
+
+@user_bp.route('/send_otp', methods=['POST'])
+def otp():
+    try:
+        data = request.json
+        number = data.get('number')
+        
+        if not number:
+            return jsonify({'message': 'Phone number is required'}), 400
+        
+        response = config.send_otp(number)  # Remove comma to avoid tuple issue
+
+        if response:  
+            return jsonify({'message': 'OTP sent'}), 200
+        else:
+            return jsonify({'message': 'Failed to send OTP'}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error: {e}")
+        return jsonify({'message': 'An error occurred', 'error': str(e)}), 500
+
+      
 @user_bp.route('/register', methods=['POST'])
 def register():
     try:
@@ -12,13 +36,18 @@ def register():
         password = data.get('password')
         name = data.get('name', 'User')
         email = data.get('email', 'No Email')
-        print(data)
-        if not number or not password:
+        otp=data.get('otp')
+        if not number or not password or not otp:
             return jsonify({'message': 'Number and password are required.'}), 400
-
+        if not otp:
+            return jsonify({'message': 'OTP required.'}), 400
+        
         ext_user = User.query.filter_by(number=number).first()
         if ext_user:
             return jsonify({'message': 'User with this number already exists.'}), 400
+        
+        if not config.verify_otp(number,otp):
+            return jsonify({'message': 'WRONG OTP'}), 400
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         new_user = User(number=number, password=hashed_password, name=name,email=email)
