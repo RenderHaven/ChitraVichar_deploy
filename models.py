@@ -247,8 +247,6 @@ class ProductItemVariation(db.Model):
             "id": self.id,
             "product_item_id": self.product_item_id,
             "variation_option_id": self.variation_option_id,
-            # "product_item": self.product_item.to_dict() if self.product_item else None,
-            # "variation_option": self.variation_option.to_dict() if self.variation_option else None,
         }
 
 
@@ -265,7 +263,17 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False,default='123456')
     addresses = db.relationship('Address', backref='user', lazy='select',cascade="all, delete-orphan")
     orders = db.relationship('Order', backref='user', lazy='select',cascade="all, delete-orphan") 
-
+    def to_small(self):
+        return {
+            "id": self.id,
+            "number": self.number,
+            "first_name" :self.name,
+            "last_name" :self.last_name,
+            "email":self.email,
+            'dob':self.dob,
+            'gender':self.gender,
+            'profile_picture':self.image_url,
+        }
     def to_dict(self):
         return {
             "id": self.id,
@@ -331,15 +339,17 @@ class Order(db.Model):
     
     # Relationship to order items
     order_items = db.relationship('OrderItems', backref='order',cascade="all, delete-orphan", lazy=True)
+
     def to_small(self):
         return {
             "id": self.o_id,
+            'user_name':self.user.name,
             "address": self.address,
             "status": self.status,
-            "datetime": self.datetime.isoformat() if self.datetime else None,
+            "datetime": self.datetime if self.datetime else None,
             "delivery_charge": self.delivery_charge,
             "total_price": self.total_price,
-            # "items": [item.to_dict() for item in self.order_items] if self.order_items else []
+            "payINFO":self.payINFO,
         }
     def to_dict(self):
         return {
@@ -347,9 +357,10 @@ class Order(db.Model):
             "user_id": self.user_id,
             "address": self.address,
             "status": self.status,
-            "datetime": self.datetime.isoformat() if self.datetime else None,
+            "datetime": self.datetime if self.datetime else None,
             "delivery_charge": self.delivery_charge,
             "total_price": self.total_price,
+            "payINFO":self.payINFO,
             "items": [item.to_dict() for item in self.order_items] if self.order_items else []
         }
 

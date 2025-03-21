@@ -154,6 +154,21 @@ def get_user(user_id):
     except Exception as e:
         print(e)
         return jsonify({'message': 'An error occurred while fetching userdata', 'error': str(e)}), 500
+    
+@user_bp.route('/get_all', methods=['GET'])
+def get_users():
+    try:
+        users = User.query.all()
+        if not users:
+            return jsonify({'message': 'Users not found.'}), 404
+
+        users_list = [user.to_small() for user in users]
+
+        return jsonify(users_list), 200
+
+    except Exception as e:
+        return jsonify({'message': 'An error occurred while fetching addresses.', 'error': str(e)}), 500
+    
 
 # Edit an existing address
 @user_bp.route('/edit_add/<string:address_id>', methods=['PUT'])
