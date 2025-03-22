@@ -15,6 +15,9 @@ from variation import variation_bp
 from orders import orders_bp
 from disc import disc_bp
 API_SECRET_KEY='<@pap@a123>'
+
+Chitra_Database="postgresql://mydatabase_lal3_user:YS6Lc8fnyyvHuTe3XMCXm5jAQOF0r9e9@dpg-cvfeotofnakc739nsjj0-a.singapore-postgres.render.com/mydatabase_lal3"
+My_Database='postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx'
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -24,7 +27,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Convert DATABASE_URL (Fix for PostgreSQL URL issues)
-database_url = os.getenv("DATABASE_URL",'postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx')  #"postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx"
+database_url = os.getenv("DATABASE_URL",Chitra_Database)  #"postgresql://finaldb_vhpx_user:tMnuBkVSZTtDw0SSQWxqZuPO6Ng6w3DI@dpg-cv6rm0ogph6c73dpce30-a.singapore-postgres.render.com/finaldb_vhpx"
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 

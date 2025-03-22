@@ -15,11 +15,11 @@ product_data = {
         "name": "Promotion",
         "CId": None,  # Link this product to the "Home" category
     },
-    # "Pro4": {
-    #     "PId": 'Test',
-    #     "name": "Testing",
-    #     "CId": 'Home',  # Link this product to the "Home" category
-    # },
+    "Personal": {
+        "PId": 'MY',
+        "name": "My",
+        "CId": None,  # Link this product to the "Home" category
+    },
 }
 
 variation_data = {
@@ -43,18 +43,9 @@ def insert_data():
     new_item = ProductItem(
             i_id='Lable',
             name='Lables',
-            image_url='dsd',
         )
     db.session.add(new_item)
     db.session.commit()
-    # Insert categories
-    # for id, info in category_data.items():
-    #     new_category = Category(
-    #         c_id=info['CId'],
-    #         pc_id=info['PId'],  # Parent category ID
-    #         name=info['name'],
-    #     )
-    #     db.session.add(new_category)
 
     # Insert products
     for id, info in product_data.items():
