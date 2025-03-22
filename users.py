@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from models import db, User, Address,Cart
+from models import db, User, Address
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.exc import DatabaseError
 import config
@@ -222,52 +222,52 @@ def edit_user(user_id):
         print(e)
         return jsonify({'message': 'An error occurred while updating user data.', 'error': str(e)}), 500
     
-@user_bp.route('/get_card_item/<string:user_id>', methods=['GET'])
-def get_card_item(user_id):
-    """
-    Fetch all orders for a given user_id in card format.
-    """
-    try:
-        # Query all orders for the given user_id
-        carts = Cart.query.filter_by(user_id=user_id).all()
+# @user_bp.route('/get_card_item/<string:user_id>', methods=['GET'])
+# def get_card_item(user_id):
+#     """
+#     Fetch all orders for a given user_id in card format.
+#     """
+#     try:
+#         # Query all orders for the given user_id
+#         carts = Cart.query.filter_by(user_id=user_id).all()
         
-        if carts:
-            return jsonify([cart.to_dict() for cart in carts]), 200
-        else:
-            return jsonify({"message": "No orders found for the given user_id"}), 404
-    except Exception as err:
-        print(err)
-        return jsonify({"error": "An error occurred while fetching the orders"}), 500
+#         if carts:
+#             return jsonify([cart.to_dict() for cart in carts]), 200
+#         else:
+#             return jsonify({"message": "No orders found for the given user_id"}), 404
+#     except Exception as err:
+#         print(err)
+#         return jsonify({"error": "An error occurred while fetching the orders"}), 500
 
-@user_bp.route('/add_to_cart', methods=['POST'])
-def add_to_cart():
-    data = request.json
-    try:
-        # Check if the item already exists in the cart for the same user
-        existing_item = Cart.query.filter_by(i_id=data['i_id'], user_id=data['user_id']).first()
+# @user_bp.route('/add_to_cart', methods=['POST'])
+# def add_to_cart():
+#     data = request.json
+#     try:
+#         # Check if the item already exists in the cart for the same user
+#         existing_item = Cart.query.filter_by(i_id=data['i_id'], user_id=data['user_id']).first()
 
-        if existing_item:
-            return jsonify({"message": "Item already exists in the cart"}), 409  # HTTP 409 Conflict
+#         if existing_item:
+#             return jsonify({"message": "Item already exists in the cart"}), 409  # HTTP 409 Conflict
         
-        # If item does not exist, add it to the cart
-        order = Cart(**data)
-        db.session.add(order)
-        db.session.commit()
-        return jsonify(order.to_dict()), 201  # HTTP 201 Created
+#         # If item does not exist, add it to the cart
+#         order = Cart(**data)
+#         db.session.add(order)
+#         db.session.commit()
+#         return jsonify(order.to_dict()), 201  # HTTP 201 Created
     
-    except DatabaseError as err:
-        db.session.rollback()
-        print(err)
-        return jsonify({"error": str(err)}), 400  # HTTP 400 Bad Request
+#     except DatabaseError as err:
+#         db.session.rollback()
+#         print(err)
+#         return jsonify({"error": str(err)}), 400  # HTTP 400 Bad Request
 
     
 
-@user_bp.route('/remove_from_cart/<string:cart_id>', methods=['DELETE'])
-def delete_cart(cart_id):
-    order = Cart.query.get(cart_id)
-    if order:
-        db.session.delete(order)
-        db.session.commit()
-        return jsonify({"message": "Cart Item deleted successfully"}), 200
-    else:
-        return jsonify({"error": "Cart Item not found"}), 404
+# @user_bp.route('/remove_from_cart/<string:cart_id>', methods=['DELETE'])
+# def delete_cart(cart_id):
+#     order = Cart.query.get(cart_id)
+#     if order:
+#         db.session.delete(order)
+#         db.session.commit()
+#         return jsonify({"message": "Cart Item deleted successfully"}), 200
+#     else:
+#         return jsonify({"error": "Cart Item not found"}), 404

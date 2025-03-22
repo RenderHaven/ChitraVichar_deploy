@@ -1,5 +1,5 @@
 import uuid
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,g
 from sqlalchemy.exc import DatabaseError
 from models import Order,OrderItems,db
 
@@ -7,6 +7,8 @@ orders_bp = Blueprint('orders', __name__)
 
 @orders_bp.route('/get_all', methods=['GET'])
 def get_orders():
+    if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
     orders = Order.query.all()
     return jsonify([order.to_small() for order in orders])
 
@@ -18,21 +20,28 @@ def get_order(order_id):
     else:
         return jsonify({"error": "Order not found"}), 404
 
-
-@orders_bp.route('/edit/<string:order_id>', methods=['PUT'])
+    
+@orders_bp.route('/update_status/<string:order_id>', methods=['PUT'])
 def update_order(order_id):
+    if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
     order = Order.query.get(order_id)
     if order:
         data = request.json
-        for key, value in data.items():
-            setattr(order, key, value)
-        db.session.commit()
+        status=data.get('status')
+        if status:
+            order.status=status
+            db.session.commit()
         return jsonify(order.to_dict()), 200
     else:
         return jsonify({"error": "Order not found"}), 404
+    
+
 
 @orders_bp.route('/delete/<string:order_id>', methods=['DELETE'])
 def delete_order(order_id):
+    if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
     order = Order.query.get(order_id)
     if order:
         db.session.delete(order)

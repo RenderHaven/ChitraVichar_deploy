@@ -94,7 +94,7 @@ class ProductItem(db.Model):
     products = relationship('Product', secondary='product_to_items', back_populates="product_items",lazy='select')
     variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan",lazy='select')
     # orders = db.relationship('Order', backref='item', cascade="all, delete-orphan")
-    carts = db.relationship('Cart', backref='item', lazy='select',cascade="all, delete-orphan")
+    # carts = db.relationship('Cart', backref='item', lazy='select',cascade="all, delete-orphan")
 
     
     def _group_variation_data(self,all=True):
@@ -173,16 +173,16 @@ class ProductItem(db.Model):
             "image_url": self.image_url,
             "price": self.price,
         }
-    def to_cart_dict(self):
-        grouped_variations, max_discount = self._group_variation_data()
-        return {
-            "i_id": self.i_id,
-            "name": self.name,
-            "image_url": self.image_url,
-            "price": self.price,
-            "variations": grouped_variations,
-            "discount": max_discount,
-        }
+    # def to_cart_dict(self):
+    #     grouped_variations, max_discount = self._group_variation_data()
+    #     return {
+    #         "i_id": self.i_id,
+    #         "name": self.name,
+    #         "image_url": self.image_url,
+    #         "price": self.price,
+    #         "variations": grouped_variations,
+    #         "discount": max_discount,
+    #     }
 
 
 
@@ -307,21 +307,21 @@ class Address(db.Model):
             "zip_code": self.zip_code,
         }
 
-class Cart(db.Model):
-    __tablename__ = 'cart'
+# class Cart(db.Model):
+#     __tablename__ = 'cart'
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)  # Reference to User
-    i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)  # Reference to ProductItem
+#     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+#     user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)  # Reference to User
+#     i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)  # Reference to ProductItem
 
     
     
-    def to_dict(self):
-        data=self.item.to_small_dict()
-        return {
-            'cart_id':self.id,
-            **data
-        }
+#     def to_dict(self):
+#         data=self.item.to_small_dict()
+#         return {
+#             'cart_id':self.id,
+#             **data
+#         }
 
 class Order(db.Model):
     __tablename__ = 'orders'
