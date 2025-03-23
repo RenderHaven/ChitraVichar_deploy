@@ -268,33 +268,10 @@ def search_products():
             "p_id": p.p_id,
             "c_id" :p.parent_id,
             "name": p.name,
-            # "Type": p.Type,
+            # "type": p.Type,
             # "discount": p.discount,
         } for p in products]
     return jsonify(result), 200
-
-# @product_bp.route('/search_query', methods=['GET'])
-# def search_products_byquery():
-#     query = request.args.get('query', '').strip()
-#     if len(query) < 3:
-#         return jsonify({"error": "Search query must be at least 3 characters long"}), 400
-    
-        
-
-#     # Search products by name (case-insensitive)
-#     if g.is_valid_request:
-#         products = Product.query.all()
-#     else:
-#         products = query.filter(Product.is_active == True).all()
-
-#     result = [{
-#             "p_id": p.p_id,
-#             "c_id" :p.parent_id,
-#             "name": p.name,
-#             "Type": p.Type,
-#             "discount": p.discount,
-#         } for p in products if p.is_active]
-#     return jsonify(result), 200
 
 
 @product_bp.route('/remove_item_from_product/<product_id>', methods=['POST'])
@@ -341,7 +318,7 @@ def get_products_by_gender():
             or_(
                 Product.Type == 'Man',
                 Product.Type == 'Women',
-                Product.Type == 'UniSex',
+                Product.Type == 'Unisex',
             ),
         ).all()
 
