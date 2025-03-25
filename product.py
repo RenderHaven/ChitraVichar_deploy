@@ -1,3 +1,4 @@
+from collections import defaultdict
 from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, Description
 import category as Cat
@@ -419,6 +420,81 @@ def item_from_product():
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
+
+@product_bp.route('/get_items_by_category', methods=['POST'])
+def item_from_category():
+    try:
+        if not request.is_json:
+            return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
+
+        data = request.get_json()
+        product_ids = data.get('product_ids', [])
+
+        if not product_ids:
+            return jsonify({'error': 'No product IDs provided'}), 400
+
+        # Recursive CTE query to fetch all product IDs efficiently
+        query = text("""
+            WITH RECURSIVE product_tree AS (
+                SELECT p_id, parent_id FROM products 
+                WHERE p_id = ANY(:product_ids) AND is_active = TRUE
+                UNION ALL
+                SELECT p.p_id, p.parent_id FROM products p
+                JOIN product_tree pt ON p.parent_id = pt.p_id
+                WHERE p.is_active = TRUE
+            )
+            SELECT p_id, parent_id FROM product_tree;
+        """)
+
+        result = db.session.execute(query, {"product_ids": product_ids})
+        product_data = result.fetchall()
+
+        if not product_data:
+            return jsonify({'error': 'No products found'}), 404
+
+        all_product_ids = [p_id for p_id, _ in product_data]
+        
+        # Fetch names separately for better performance
+        name_query = text("SELECT p_id, name FROM products WHERE p_id = ANY(:product_ids)")
+        name_result = db.session.execute(name_query, {"product_ids": all_product_ids})
+        product_names = {p_id: name for p_id, name in name_result.fetchall()}
+
+        # Build product hierarchy efficiently
+        product_hierarchy = defaultdict(lambda: {"items_data": [], "sub_products": []})
+        parent_map = {}
+
+        for p_id, parent_id in product_data:
+            parent_map[p_id] = parent_id
+            if parent_id:
+                product_hierarchy[parent_id]["sub_products"].append(
+                    {"p_id": p_id, "name": product_names.get(p_id, "")}
+                )
+
+        # Fetch product items efficiently
+        product_items = db.session.query(ProductItem, ProToItem.p_id).join(ProToItem).filter(
+            ProToItem.p_id.in_(all_product_ids)
+        ).all()
+
+        item_map = defaultdict(list)
+        for item, p_id in product_items:
+            item_map[p_id].append(item.to_small_dict())
+
+        # Distribute items up the hierarchy
+        for p_id in all_product_ids:
+            current = p_id
+            while current:
+                if current in product_hierarchy and p_id in item_map:
+                    product_hierarchy[current]["items_data"].extend(item_map[p_id])
+                current = parent_map.get(current)
+
+        return jsonify(product_hierarchy), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+    
 
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):
