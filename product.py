@@ -1,4 +1,3 @@
-from collections import defaultdict
 from flask import Blueprint, request, jsonify,g
 from models import db, Product, ProductItem, ProToItem, Description
 import category as Cat
@@ -423,6 +422,9 @@ def item_from_product():
 
 @product_bp.route('/get_items_by_category', methods=['POST'])
 def item_from_category():
+    """
+    Retrieve all product items grouped under their parent product, including sub-products.
+    """
     try:
         if not request.is_json:
             return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
@@ -433,59 +435,61 @@ def item_from_category():
         if not product_ids:
             return jsonify({'error': 'No product IDs provided'}), 400
 
-        # Recursive CTE query to fetch all product IDs efficiently
+        # Recursive CTE query to get all products and their sub-products
         query = text("""
             WITH RECURSIVE product_tree AS (
-                SELECT p_id, parent_id FROM products 
+                SELECT p_id, parent_id, name FROM products 
                 WHERE p_id = ANY(:product_ids) AND is_active = TRUE
-                UNION ALL
-                SELECT p.p_id, p.parent_id FROM products p
-                JOIN product_tree pt ON p.parent_id = pt.p_id
+                UNION
+                SELECT p.p_id, p.parent_id, p.name FROM products p
+                INNER JOIN product_tree pt ON p.parent_id = pt.p_id
                 WHERE p.is_active = TRUE
             )
-            SELECT p_id, parent_id FROM product_tree;
+            SELECT p_id, parent_id, name FROM product_tree;
         """)
 
         result = db.session.execute(query, {"product_ids": product_ids})
-        product_data = result.fetchall()
+        products = result.fetchall()
 
-        if not product_data:
+        if not products:
             return jsonify({'error': 'No products found'}), 404
 
-        all_product_ids = [p_id for p_id, _ in product_data]
-        
-        # Fetch names separately for better performance
-        name_query = text("SELECT p_id, name FROM products WHERE p_id = ANY(:product_ids)")
-        name_result = db.session.execute(name_query, {"product_ids": all_product_ids})
-        product_names = {p_id: name for p_id, name in name_result.fetchall()}
+        # Organizing products and their sub-products
+        product_hierarchy = {}
+        parent_map = {}  # Track each product’s direct parent
 
-        # Build product hierarchy efficiently
-        product_hierarchy = defaultdict(lambda: {"items_data": [], "sub_products": []})
-        parent_map = {}
+        for p_id, parent_id, name in products:
+            parent_map[p_id] = parent_id  # Track the parent-child relationship
+            
+            if parent_id in product_hierarchy:
+                product_hierarchy[parent_id]["sub_products"].append({"p_id": p_id, "name": name})
+            else:
+                product_hierarchy[parent_id] = {"items_data": [], "sub_products": [{"p_id": p_id, "name": name}]}
 
-        for p_id, parent_id in product_data:
-            parent_map[p_id] = parent_id
-            if parent_id:
-                product_hierarchy[parent_id]["sub_products"].append(
-                    {"p_id": p_id, "name": product_names.get(p_id, "")}
-                )
+            if p_id not in product_hierarchy:
+                product_hierarchy[p_id] = {"items_data": [], "sub_products": []}
 
-        # Fetch product items efficiently
+        all_product_ids = [p_id for p_id, _, _ in products]
+
+        # Fetch product items in a single query
         product_items = db.session.query(ProductItem, ProToItem.p_id).join(ProToItem).filter(
             ProToItem.p_id.in_(all_product_ids)
         ).all()
 
-        item_map = defaultdict(list)
+        # Organize items under their respective products
+        item_map = {}  # Track items by product
         for item, p_id in product_items:
+            if p_id not in item_map:
+                item_map[p_id] = []
             item_map[p_id].append(item.to_small_dict())
 
-        # Distribute items up the hierarchy
+        # Distribute items up to their top-level parent
         for p_id in all_product_ids:
             current = p_id
             while current:
                 if current in product_hierarchy and p_id in item_map:
                     product_hierarchy[current]["items_data"].extend(item_map[p_id])
-                current = parent_map.get(current)
+                current = parent_map.get(current)  # Move up the hierarchy
 
         return jsonify(product_hierarchy), 200
 
