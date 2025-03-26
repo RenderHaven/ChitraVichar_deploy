@@ -1,3 +1,4 @@
+import datetime
 import uuid
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import ForeignKey, Column, Integer, String, Float,Text
@@ -170,16 +171,6 @@ class ProductItem(db.Model):
             "image_url": self.image_url,
             "price": self.price,
         }
-    # def to_cart_dict(self):
-    #     grouped_variations, max_discount = self._group_variation_data()
-    #     return {
-    #         "i_id": self.i_id,
-    #         "name": self.name,
-    #         "image_url": self.image_url,
-    #         "price": self.price,
-    #         "variations": grouped_variations,
-    #         "discount": max_discount,
-    #     }
 
 
 
@@ -289,11 +280,12 @@ class User(db.Model):
 class Address(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)
+    # number = db.Column(db.String(15), unique=True, nullable=False)
     street = db.Column(db.String(255), nullable=False)
     city = db.Column(db.String(100), nullable=False)
     state = db.Column(db.String(100), nullable=False)
     zip_code = db.Column(db.String(20), nullable=False)
-
+    
 
     def to_dict(self):
         return {
@@ -304,21 +296,6 @@ class Address(db.Model):
             "zip_code": self.zip_code,
         }
 
-# class Cart(db.Model):
-#     __tablename__ = 'cart'
-
-#     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-#     user_id = db.Column(db.String(36), db.ForeignKey('user.id',ondelete="CASCADE"), nullable=False)  # Reference to User
-#     i_id = db.Column(db.String(36), db.ForeignKey('product_items.i_id',ondelete="CASCADE"), nullable=False)  # Reference to ProductItem
-
-    
-    
-#     def to_dict(self):
-#         data=self.item.to_small_dict()
-#         return {
-#             'cart_id':self.id,
-#             **data
-#         }
 
 class Order(db.Model):
     __tablename__ = 'orders'
@@ -402,4 +379,38 @@ class ImgItem(db.Model):
             "item_id": self.item_id,
             "image_url": self.image_url,
         }
-    
+
+
+
+class CouponCode(db.Model):
+    __tablename__ = "coupon_codes"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    code = db.Column(db.String(50), unique=True, nullable=False)
+    discount_amount = db.Column(db.Numeric(10, 2), nullable=False)
+    discount_type = db.Column(db.Enum("fixed", "percentage", name="discount_type_enum"), nullable=False)
+    max_uses = db.Column(db.Integer, default=1, nullable=False)
+    times_used = db.Column(db.Integer, default=0, nullable=False)
+    min_order_amount = db.Column(db.Numeric(10, 2), default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=db.func.now())
+
+    # Relationship with UserCouponUsage
+    user_usage = db.relationship("UserCouponUsage", backref=db.backref("coupon", lazy="select"), lazy="select")
+
+    def __repr__(self):
+        return f"<Coupon {self.code}>"
+
+
+class UserCouponUsage(db.Model):
+    __tablename__ = "user_coupon_usage"
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False, index=True)
+    coupon_code = db.Column(db.String(50), db.ForeignKey("coupon_codes.code", ondelete="SET NULL"), nullable=True)
+    used_at = db.Column(db.DateTime, default=db.func.now())
+
+    # Relationship with User
+    user = db.relationship("User", backref=db.backref("used_coupons", lazy="select"), lazy="select")
+
+    def __repr__(self):
+        return f"<User {self.user_id} used {self.coupon_code}>"

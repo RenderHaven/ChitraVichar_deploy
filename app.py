@@ -1,10 +1,10 @@
 from flask import Flask, jsonify,g,request
 from flask_cors import CORS
 from flask_migrate import Migrate
+from sqlalchemy import inspect
 from sqlalchemy.engine.url import make_url
 import os
 import logging
-
 # Import models & Blueprints
 from models import db
 from users import user_bp
@@ -14,6 +14,8 @@ from home import home_bp
 from variation import variation_bp
 from orders import orders_bp
 from disc import disc_bp
+from couponCode import coupon_bp
+
 API_SECRET_KEY='<@pap@a123>'
 
 Chitra_Database="postgresql://mydatabase_lal3_user:YS6Lc8fnyyvHuTe3XMCXm5jAQOF0r9e9@dpg-cvfeotofnakc739nsjj0-a.singapore-postgres.render.com/mydatabase_lal3"
@@ -60,10 +62,14 @@ app.register_blueprint(user_bp, url_prefix='/user')
 app.register_blueprint(variation_bp, url_prefix='/variation')
 app.register_blueprint(disc_bp, url_prefix='/description')
 app.register_blueprint(orders_bp, url_prefix='/order')
-
+app.register_blueprint(coupon_bp)
 @app.route('/')
 def index():
     return jsonify("Hello, Malik")
 
+with app.app_context():
+    inspector = inspect(db.engine)  # ✅ Use SQLAlchemy Inspector
+    tables = inspector.get_table_names()
+    print("Existing Tables:", tables)  # ✅ Prints list of tables
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=True)
