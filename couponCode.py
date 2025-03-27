@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
-from models import CouponCode, db
+from models import CouponCode, UserCouponUsage,User,db
+from sqlalchemy import and_
 import uuid
 
 coupon_bp = Blueprint("coupon", __name__, url_prefix="/coupon")
@@ -39,11 +40,20 @@ def get_coupon(coupon_id):
         "created_at": coupon.created_at
     }), 200
 
-@coupon_bp.route("/get_by_code/<string:coupon_code>", methods=["GET"])
-def get_coupon_by_code(coupon_code):
-    coupon = CouponCode.query.filter_by(code=coupon_code).first()
+@coupon_bp.route("/get_by_code/<string:couponCode>/<string:userId>", methods=["GET"])
+def get_coupon_by_code(couponCode, userId):
+    coupon = CouponCode.query.filter_by(code=couponCode).first()
+    
     if not coupon:
         return jsonify({"error": "Coupon not found"}), 404
+
+    user_usage_count = UserCouponUsage.query.filter(
+        and_(UserCouponUsage.coupon_code == couponCode, UserCouponUsage.user_id == userId)
+    ).count()
+
+    if user_usage_count >= coupon.max_uses:
+        return jsonify({"error": "Limit Exceeded For U"}), 400
+
     return jsonify({
         "id": coupon.id,
         "code": coupon.code,
