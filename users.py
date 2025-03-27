@@ -87,8 +87,6 @@ def login():
             return jsonify({'message': 'Number and password are required.'}), 400
         print(number,password)
         user = User.query.filter_by(number=number).first()
-        if(number=='+91 9461373630'):
-            return jsonify({'message': 'Login successful.', 'user_id': user.id,'user_data':user.to_dict()}), 200
         if not user or not check_password_hash(user.password, password):
             return jsonify({'message': 'Invalid number or password.'}), 401
 

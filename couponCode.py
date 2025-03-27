@@ -39,6 +39,22 @@ def get_coupon(coupon_id):
         "created_at": coupon.created_at
     }), 200
 
+@coupon_bp.route("/get_by_code/<string:coupon_code>", methods=["GET"])
+def get_coupon_by_code(coupon_code):
+    coupon = CouponCode.query.filter_by(code=coupon_code).first()
+    if not coupon:
+        return jsonify({"error": "Coupon not found"}), 404
+    return jsonify({
+        "id": coupon.id,
+        "code": coupon.code,
+        "discount_amount": str(coupon.discount_amount),
+        "discount_type": coupon.discount_type,
+        "max_uses": coupon.max_uses,
+        "times_used": coupon.times_used,
+        "min_order_amount": str(coupon.min_order_amount),
+        "created_at": coupon.created_at
+    }), 200
+
 # Add a new coupon
 @coupon_bp.route("/add", methods=["POST"])
 def add_coupon():
