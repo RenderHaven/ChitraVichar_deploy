@@ -4,7 +4,6 @@ from flask import Blueprint, json, request, jsonify,g
 import requests
 from sqlalchemy.exc import DatabaseError
 from models import Order,OrderItems,db
-import razorpay
 import time
 
 RAZORPAY_KEY_ID = "rzp_live_3HDGImYvtaYcya"
