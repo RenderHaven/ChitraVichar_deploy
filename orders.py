@@ -1,7 +1,16 @@
+import hashlib
 import uuid
-from flask import Blueprint, request, jsonify,g
+from flask import Blueprint, json, request, jsonify,g
+import requests
 from sqlalchemy.exc import DatabaseError
 from models import Order,OrderItems,db
+import razorpay
+import time
+
+RAZORPAY_KEY_ID = "rzp_live_3HDGImYvtaYcya"
+RAZORPAY_KEY_SECRET = "yyNAkeWME5Y7WS1s5Yuu3LeE"
+RAZORPAY_BASE_URL = "https://api.razorpay.com/v1/payment_links"
+
 
 orders_bp = Blueprint('orders', __name__)
 
@@ -67,7 +76,7 @@ def create_order():
             total_price=order_data.get("total_price", 0.0),
             address=order_data.get("address"),
             short_note=order_data.get("short_note"),
-            payINFO=order_data.get("payINFO")
+            payINFO=order_data.get("payINFO",'NA')
         )
         db.session.add(new_order)
         # Create Order Items
@@ -91,4 +100,63 @@ def create_order():
         print(e)
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+    
+@orders_bp.route('/create_payment_orderId', methods=['POST'])
+def create_paymentId():
+    try:
+        data = request.json
+        amount = int(float(data.get("amount", 0)) * 100)  # Convert INR to paise
 
+        if amount <= 0:
+            return jsonify({"error": "Invalid amount"}), 400
+
+        payload = {
+            "amount": amount,
+            "currency": "INR",
+            "payment_capture": 1,  # Auto-capture payment
+        }
+
+        headers = {"Content-Type": "application/json"}
+        auth = (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+
+        response = requests.post("https://api.razorpay.com/v1/orders", json=payload, auth=auth, headers=headers)
+        res_data = response.json()
+
+        if response.status_code in [200, 201]:
+            return jsonify({"order_id": res_data["id"], "amount": res_data["amount"]}), 201
+        else:
+            return jsonify({"error": res_data}), response.status_code
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@orders_bp.route('/verify_payment/<order_id>', methods=['GET'])
+def verify_payment(order_id):
+    try:
+        print('Fetching payments for order:', order_id)
+        auth = (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+        response = requests.get(f"https://api.razorpay.com/v1/orders/{order_id}/payments", auth=auth)
+        res_data = response.json()
+
+        if response.status_code in [200, 201]:
+            print("Razorpay API Response:", res_data)
+            payment_captured = False
+            if isinstance(res_data, dict) and 'items' in res_data:
+                for payment in res_data['items']:
+                    if payment['status'] == 'captured':
+                        payment_captured = True
+                        break
+            elif isinstance(res_data, list):
+                for payment in res_data:
+                    if payment['status'] == 'captured':
+                        payment_captured = True
+                        break
+
+            return str(payment_captured).lower(), 200 
+        else:
+            print("Razorpay API Error:", res_data)
+            return jsonify(False), response.status_code
+
+    except Exception as e:
+        print("Exception during verification:", e)
+        return jsonify({"error": str(e)}), 500
