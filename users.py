@@ -36,18 +36,18 @@ def register():
         password = data.get('password')
         name = data.get('name', 'User')
         email = data.get('email', 'No Email')
-        otp=data.get('otp')
-        if not number or not password or not otp:
+        token=data.get('otp')
+        if not number or not password:
             return jsonify({'message': 'Number and password are required.'}), 400
-        if not otp:
+        if not token:
             return jsonify({'message': 'OTP required.'}), 400
         
         ext_user = User.query.filter_by(number=number).first()
         if ext_user:
             return jsonify({'message': 'User with this number already exists.'}), 400
         
-        if not config.verify_otp(number,otp):
-            return jsonify({'message': 'WRONG OTP'}), 400
+        # if not config.verify_otp(number,otp):
+        #     return jsonify({'message': 'WRONG OTP'}), 400
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         new_user = User(number=number, password=hashed_password, name=name,email=email)

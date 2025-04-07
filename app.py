@@ -5,7 +5,6 @@ from sqlalchemy import inspect
 from sqlalchemy.engine.url import make_url
 import os
 import logging
-# Import models & Blueprints
 from models import db
 from users import user_bp
 from product import product_bp
@@ -63,6 +62,7 @@ app.register_blueprint(variation_bp, url_prefix='/variation')
 app.register_blueprint(disc_bp, url_prefix='/description')
 app.register_blueprint(orders_bp, url_prefix='/order')
 app.register_blueprint(coupon_bp)
+
 @app.route('/')
 def index():
     return jsonify("Hello, Malik")
@@ -71,5 +71,7 @@ with app.app_context():
     inspector = inspect(db.engine)  # ✅ Use SQLAlchemy Inspector
     tables = inspector.get_table_names()
     print("Existing Tables:", tables)  # ✅ Prints list of tables
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv("PORT", 5000)), debug=True)

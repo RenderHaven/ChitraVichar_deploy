@@ -430,7 +430,7 @@ def item_from_category():
             return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
 
         data = request.get_json()
-        product_ids = data.get('product_ids', [])
+        product_ids = [data.get('product_id', '')]
 
         if not product_ids:
             return jsonify({'error': 'No product IDs provided'}), 400

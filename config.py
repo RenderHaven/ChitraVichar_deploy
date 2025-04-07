@@ -5,6 +5,7 @@ import base64
 import cloudinary
 import cloudinary.uploader
 import time,json,random,requests
+
 OTP_FILE = "otp_store.json"
 cloudinary.config(
     cloud_name="dlvg9hkax",
@@ -12,7 +13,26 @@ cloudinary.config(
     api_secret="mSix-JVm0Y0rmxzNbkt3M2K-toE"
 )
 
+AUTH_KEY = 'your_msg91_auth_key'
+SENDER_ID = 'your_sender_id'
+TEMPLATE_ID = 'your_template_id'
 
+def send_otpMSG91(phone):
+    url = "https://control.msg91.com/api/v5/otp"
+
+    payload = {
+        "template_id": TEMPLATE_ID,
+        "mobile": f"+91{phone}",
+        "authkey": AUTH_KEY
+    }
+
+    response = requests.post(url, json=payload)
+    return jsonify(response.json())
+
+def verify_otpMSG91(phone,otp):
+    url = f"https://control.msg91.com/api/v5/otp/verify?mobile=+91{phone}&otp={otp}&authkey={AUTH_KEY}"
+    response = requests.get(url)
+    return jsonify(response.json())
 
 def uploadImg(base64_image):
     try:
@@ -39,6 +59,7 @@ def save_otps(otps):
 
 def generate_otp():
     return str(random.randint(100000, 999999))
+
 def send_otp_request(phone, otp):
     """Sends OTP using your notification API"""
 
@@ -66,14 +87,12 @@ def send_otp_request(phone, otp):
 def send_otp(phone):
 
     otp = generate_otp()
-    otp='123456'
     timestamp = int(time.time())
-
     otps = load_otps()
     otps[phone] = {"otp": otp, "timestamp": timestamp}
     save_otps(otps)
     
-    # send_otp_request(phone,otp)
+    send_otp_request(phone,otp)
 
     return jsonify({"message": "OTP sent successfully", "otp": otp})
 

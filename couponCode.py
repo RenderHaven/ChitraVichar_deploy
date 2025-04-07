@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify,g
 from models import CouponCode, UserCouponUsage,User,db
 from sqlalchemy import and_
 import uuid
@@ -8,6 +8,8 @@ coupon_bp = Blueprint("coupon", __name__, url_prefix="/coupon")
 # Get all coupons
 @coupon_bp.route("/get_all", methods=["GET"])
 def get_all_coupons():
+    if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
     coupons = CouponCode.query.all()
     return jsonify([
         {
@@ -68,6 +70,8 @@ def get_coupon_by_code(couponCode, userId):
 # Add a new coupon
 @coupon_bp.route("/add", methods=["POST"])
 def add_coupon():
+    if not g.is_valid_request:
+        return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.json
         new_coupon = CouponCode(
@@ -88,6 +92,8 @@ def add_coupon():
 # Update a coupon
 @coupon_bp.route("/update/<string:coupon_id>", methods=["PUT"])
 def update_coupon(coupon_id):
+    if not g.is_valid_request:
+        return jsonify({"error": "Unauthorized"}), 401
     coupon = CouponCode.query.get(coupon_id)
     if not coupon:
         return jsonify({"error": "Coupon not found"}), 404
@@ -115,6 +121,8 @@ def update_coupon(coupon_id):
 # Delete a coupon
 @coupon_bp.route("/delete/<string:coupon_id>", methods=["DELETE"])
 def delete_coupon(coupon_id):
+    if not g.is_valid_request:
+        return jsonify({"error": "Unauthorized"}), 401
     coupon = CouponCode.query.get(coupon_id)
     if not coupon:
         return jsonify({"error": "Coupon not found"}), 404
