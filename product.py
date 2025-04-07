@@ -306,74 +306,10 @@ def remove_item_from_product(product_id):
     
 
 
-
-@product_bp.route('/get_products_of_gender/', methods=['GET'])
-def get_products_by_gender():
+@product_bp.route('/get_items_by_product_list', methods=['POST'])
+def item_from_products():
     """
-    Retrieves a list of products filtered by gender type (Man, Woman, UniSex).
-    """
-    try:
-        # Query subcategories based on the Type field
-        all_products = Product.query_active(g.get("is_valid_request", False)).filter(
-            or_(
-                Product.Type == 'Man',
-                Product.Type == 'Women',
-                Product.Type == 'Unisex',
-            ),
-        ).all()
-
-        if not all_products:
-            return jsonify([]), 200
-
-        # Prepare product data
-        data = [
-            {
-                "p_id": product.p_id,
-                "name": product.name,
-                "image_url": product.image_url,
-                "type": product.Type
-            }
-            for product in all_products
-        ]
-
-        return jsonify(data), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
-@product_bp.route('/get_new_products/', methods=['GET'])
-def get_new_products():
-    """
-    Retrieves a list of products filtered by gender type (Man, Woman, UniSex).
-    """
-    try:
-        # Query subcategories based on the Type field
-        all_products = Product.query_active(g.get("is_valid_request", False)).filter(Product.is_new==True,).all()
-
-        if not all_products:
-            return jsonify([]), 200
-
-        # Prepare product data
-        data = [
-            {
-                "p_id": product.p_id,
-                "name": product.name,
-                "image_url": product.image_url,
-            }
-            for product in all_products
-        ]
-
-        return jsonify(data), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
-@product_bp.route('/get_items_by_productlist', methods=['POST'])
-def item_from_product():
-    """
-    Retrieve all product items linked to a list of products, including their sub-products.
+    Retrieve all product items linked to a list of products, grouped by product_id.
     """
     try:
         # Validate request
@@ -385,118 +321,103 @@ def item_from_product():
 
         if not product_ids:
             return jsonify({'error': 'No product IDs provided'}), 400
-
-        # Recursive CTE query to get all products and their sub-products
-        query = text("""
-                WITH RECURSIVE product_tree AS (
-                    SELECT p_id, parent_id FROM products 
-                    WHERE p_id = ANY(:product_ids) AND is_active = TRUE
-                    UNION
-                    SELECT p.p_id, p.parent_id FROM products p
-                    INNER JOIN product_tree pt ON p.parent_id = pt.p_id
-                    WHERE p.is_active = TRUE
-                )
-                SELECT p_id FROM product_tree;
-            """)
-
-        result = db.session.execute(query, {"product_ids": product_ids})
-        all_product_ids = [row[0] for row in result.fetchall()]
-
-        if not all_product_ids:
-            return jsonify({'error': 'No products found'}), 404
-
-        # Fetch product items in a single query
-        product_items = db.session.query(ProductItem).join(ProToItem).filter(
-            ProToItem.p_id.in_(all_product_ids)
+        
+        # Initialize with empty lists
+        grouped_items = {pid: [] for pid in product_ids}
+        # Fetch product items with product IDs
+        product_items = db.session.query(ProductItem, ProToItem.p_id).join(ProToItem).filter(
+            ProToItem.p_id.in_(product_ids)
         ).all()
 
-        # Prepare response
-        items_data = [item.to_small_dict() for item in product_items]
+        for item, p_id in product_items:
+            grouped_items.setdefault(p_id, []).append(item.to_small_dict())
 
-        return jsonify(items_data), 200
+        return jsonify(grouped_items), 200
 
     except Exception as e:
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
-@product_bp.route('/get_items_by_category', methods=['POST'])
-def item_from_category():
+    
+
+@product_bp.route('/get_products_tree', methods=['POST'])
+def product_tree():
     """
-    Retrieve all product items grouped under their parent product, including sub-products.
+    Retrieve all product items under the product tree rooted at a given product_id.
+    Excludes any product IDs provided in 'product_ids_exclude'.
+    Returns full tree structure but skips actual data and children of excluded IDs.
     """
     try:
         if not request.is_json:
             return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
 
-        data = request.get_json()
-        product_ids = [data.get('product_id', '')]
+        root_product_id ='Home'
+        product_ids_exclude = []
 
-        if not product_ids:
-            return jsonify({'error': 'No product IDs provided'}), 400
+        if not root_product_id:
+            return jsonify({'error': 'No product_id provided'}), 400
 
-        # Recursive CTE query to get all products and their sub-products
+        # Recursive CTE: track if a node is excluded, skip recursion if parent is excluded
         query = text("""
             WITH RECURSIVE product_tree AS (
-                SELECT p_id, parent_id, name FROM products 
-                WHERE p_id = ANY(:product_ids) AND is_active = TRUE
-                UNION
-                SELECT p.p_id, p.parent_id, p.name FROM products p
+                SELECT p_id, parent_id, name, image_url, is_new,"Type" ,
+                       (p_id = ANY(:exclude_ids)) AS is_excluded
+                FROM products 
+                WHERE p_id = :root_id AND is_active = TRUE
+                UNION ALL
+                SELECT p.p_id, p.parent_id, p.name, p.image_url, p.is_new, p."Type",
+                       (p.p_id = ANY(:exclude_ids)) AS is_excluded
+                FROM products p
                 INNER JOIN product_tree pt ON p.parent_id = pt.p_id
-                WHERE p.is_active = TRUE
+                WHERE p.is_active = TRUE AND pt.is_excluded = FALSE
             )
-            SELECT p_id, parent_id, name FROM product_tree;
+            SELECT * FROM product_tree;
         """)
 
-        result = db.session.execute(query, {"product_ids": product_ids})
+        result = db.session.execute(query, {
+            "root_id": root_product_id,
+            "exclude_ids": product_ids_exclude
+        })
         products = result.fetchall()
 
         if not products:
             return jsonify({'error': 'No products found'}), 404
 
-        # Organizing products and their sub-products
-        product_hierarchy = {}
-        parent_map = {}  # Track each product’s direct parent
+        product_dict = {}
+        parent_map = {}
 
-        for p_id, parent_id, name in products:
-            parent_map[p_id] = parent_id  # Track the parent-child relationship
-            
-            if parent_id in product_hierarchy:
-                product_hierarchy[parent_id]["sub_products"].append({"p_id": p_id, "name": name})
-            else:
-                product_hierarchy[parent_id] = {"items_data": [], "sub_products": [{"p_id": p_id, "name": name}]}
+        for row in products:
+            p_id, parent_id, name, image_url, is_new,type, is_excluded= row
+            parent_map[p_id] = parent_id
 
-            if p_id not in product_hierarchy:
-                product_hierarchy[p_id] = {"items_data": [], "sub_products": []}
+            if not is_excluded:
+                product_dict[p_id] = {
+                    "p_id": p_id,
+                    "c_id":parent_id,
+                    "name": name,
+                    "image_url": image_url,
+                    "is_new": is_new,
+                    "type":type,
+                    "sub_products": [],
+                }
 
-        all_product_ids = [p_id for p_id, _, _ in products]
+        # Link children (even excluded ones) to their parent’s sub_products
+        for child_id, parent_id in parent_map.items():
+            if parent_id in product_dict:
+                product_dict[parent_id]["sub_products"].append(child_id)
 
-        # Fetch product items in a single query
-        product_items = db.session.query(ProductItem, ProToItem.p_id).join(ProToItem).filter(
-            ProToItem.p_id.in_(all_product_ids)
-        ).all()
-
-        # Organize items under their respective products
-        item_map = {}  # Track items by product
-        for item, p_id in product_items:
-            if p_id not in item_map:
-                item_map[p_id] = []
-            item_map[p_id].append(item.to_small_dict())
-
-        # Distribute items up to their top-level parent
-        for p_id in all_product_ids:
-            current = p_id
-            while current:
-                if current in product_hierarchy and p_id in item_map:
-                    product_hierarchy[current]["items_data"].extend(item_map[p_id])
-                current = parent_map.get(current)  # Move up the hierarchy
-
-        return jsonify(product_hierarchy), 200
+        return jsonify(product_dict), 200
 
     except Exception as e:
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+
+
+
 
     
 
