@@ -27,6 +27,7 @@ def add_product():
         discount=data.get('discount')
         is_active = bool(data.get('is_active')) if data.get('is_active') is not None else None
         is_new = bool(data.get('is_new')) if data.get('is_new') is not None else None
+        is_promotion = bool(data.get('is_promotion')) if data.get('is_promotion') is not None else None
         print(data)
         if not pc_id or not product_name:
             return jsonify({"error": "pc_id and name are required"}), 400
@@ -45,6 +46,7 @@ def add_product():
             Type=typ,
             is_active=is_active,
             is_new=is_new,
+            is_promotion=is_promotion,
         )
         db.session.add(new_product)
         db.session.commit()
@@ -75,7 +77,7 @@ def edit_product(product_id):
         new_discount = data.get('discount')
         is_active = bool(data.get('is_active')) if data.get('is_active') is not None else None
         is_new = bool(data.get('is_new')) if data.get('is_new') is not None else None
-
+        is_promotion = bool(data.get('is_promotion')) if data.get('is_promotion') is not None else None
         # Find the product
         product = Product.query.get_or_404(product_id)
 
@@ -90,7 +92,8 @@ def edit_product(product_id):
             product.is_active = is_active
         if is_new is not None:
             product.is_new = is_new
-
+        if is_promotion is not None:
+            product.is_promotion = is_promotion
         db.session.commit()
 
         return jsonify({
@@ -101,7 +104,8 @@ def edit_product(product_id):
                 "type": product.Type,
                 "discount": product.discount,
                 "is_active": product.is_active,
-                "is_new": product.is_new
+                "is_new": product.is_new,
+                "is_promotion": product.is_promotion
             }
         }), 200
 
@@ -144,7 +148,8 @@ def move_product(product_id):
                 "type": product.Type,
                 "discount": product.discount,
                 "is_active": product.is_active,
-                "is_new": product.is_new
+                "is_new": product.is_new,
+                "is_promotion": product.is_promotion
             }
         }), 200
 
@@ -268,6 +273,7 @@ def search_products():
             "p_id": p.p_id,
             "c_id" :p.parent_id,
             "name": p.name,
+            # "is_promotion": p.is_promotion,
             # "type": p.Type,
             # "discount": p.discount,
         } for p in products]
@@ -361,12 +367,12 @@ def product_tree():
         # Recursive CTE: track if a node is excluded, skip recursion if parent is excluded
         query = text("""
             WITH RECURSIVE product_tree AS (
-                SELECT p_id, parent_id, name, image_url, is_new,"Type" ,
+                SELECT p_id, parent_id, name, image_url, is_new,"Type",is_promotion,
                        (p_id = ANY(:exclude_ids)) AS is_excluded
                 FROM products 
                 WHERE p_id = :root_id AND is_active = TRUE
                 UNION ALL
-                SELECT p.p_id, p.parent_id, p.name, p.image_url, p.is_new, p."Type",
+                SELECT p.p_id, p.parent_id, p.name, p.image_url, p.is_new, p."Type",p.is_promotion,
                        (p.p_id = ANY(:exclude_ids)) AS is_excluded
                 FROM products p
                 INNER JOIN product_tree pt ON p.parent_id = pt.p_id
@@ -388,7 +394,7 @@ def product_tree():
         parent_map = {}
 
         for row in products:
-            p_id, parent_id, name, image_url, is_new,type, is_excluded= row
+            p_id, parent_id, name, image_url, is_new,type,is_promotion, is_excluded= row
             parent_map[p_id] = parent_id
 
             if not is_excluded:
@@ -399,6 +405,7 @@ def product_tree():
                     "image_url": image_url,
                     "is_new": is_new,
                     "type":type,
+                    "is_promotion": is_promotion,
                     "sub_products": [],
                 }
 
@@ -413,13 +420,6 @@ def product_tree():
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
-
-
-
-
-
-
-    
 
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):

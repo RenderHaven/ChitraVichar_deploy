@@ -27,15 +27,12 @@ class Product(db.Model):
     p_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     parent_id = db.Column(db.String(36), db.ForeignKey('products.p_id', ondelete="CASCADE"), nullable=True) 
     name = db.Column(db.String(200), nullable=False)
-    disc_id = db.Column(db.String(36), ForeignKey('descriptions.id'), nullable=True)  # Reference to Description
     image_url = db.Column(db.String(500))
-    # c_id = db.Column(db.String(36), ForeignKey('categories.c_id'), nullable=False)
     Type = db.Column(db.String(200), nullable=False, default="Other")
     discount = db.Column(db.Float, nullable=False, default=0.0)
     is_active = db.Column(db.Boolean, default=True)  # Boolean column
     is_new = db.Column(db.Boolean, default=False)  # Boolean column
-    # category = relationship("Category", back_populates="products")
-    description = relationship("Description", backref="products")  # Relationship with Description table
+    is_promotion = db.Column(db.Boolean, default=False) 
     product_items = relationship('ProductItem', secondary='product_to_items', back_populates="products")
 
     sub_products = db.relationship(
@@ -63,6 +60,7 @@ class Product(db.Model):
             "items_id": [item.i_id for item in self.product_items],
             "is_active": self.is_active,
             "is_new": self.is_new,
+            "is_promotion":self.is_promotion,
         }
     def to_small_dict(self):
         return {
@@ -74,6 +72,7 @@ class Product(db.Model):
             "discount": self.discount,
             "is_active": self.is_active,
             "is_new": self.is_new,
+            "is_promotion":self.is_promotion,
         }
 
 
@@ -91,8 +90,6 @@ class ProductItem(db.Model):
     description = relationship("Description", backref="product_items")  # Relationship with Description table
     products = relationship('Product', secondary='product_to_items', back_populates="product_items",lazy='select')
     variations = relationship("ProductItemVariation", back_populates="product_item", cascade="all, delete-orphan",lazy='select')
-    # orders = db.relationship('Order', backref='item', cascade="all, delete-orphan")
-    # carts = db.relationship('Cart', backref='item', lazy='select',cascade="all, delete-orphan")
 
     
     def _group_variation_data(self,all=True):
