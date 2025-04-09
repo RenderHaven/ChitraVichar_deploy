@@ -420,7 +420,61 @@ def product_tree():
         db.session.rollback()
         print(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
+    
+@product_bp.route('/get_products_treeAdmin', methods=['POST'])
+def product_treeAdmin():
+    """
+    Retrieve all products and format them into a parent-child tree structure.
+    Each key in the returned dictionary is a product's p_id.
+    The 'sub_products' list contains only child p_ids.
+    """
+    try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+        if not request.is_json:
+            return jsonify({'error': 'Invalid content type. Expected application/json'}), 415
 
+        # Fetch all products
+        query = text("""
+            SELECT p_id, parent_id, name, image_url, is_new, "Type", is_promotion, is_active
+            FROM products;
+        """)
+        result = db.session.execute(query)
+        products = result.fetchall()
+
+        if not products:
+            return jsonify({'error': 'No products found'}), 404
+
+        # Step 1: Create product_dict with each p_id as key
+        product_dict = {}
+        for row in products:
+            p_id, parent_id, name, image_url, is_new, type, is_promotion, is_active = row
+            product_dict[p_id] = {
+                "p_id": p_id,
+                "c_id": parent_id,
+                "name": name,
+                "image_url": image_url,
+                "is_new": is_new,
+                "type": type,
+                "is_promotion": is_promotion,
+                "is_active": is_active,
+                "sub_products": [],
+            }
+
+        # Step 2: Build hierarchy by linking only p_ids in sub_products
+        for product in product_dict.values():
+            parent_id = product["c_id"]
+            if parent_id in product_dict:
+                product_dict[parent_id]["sub_products"].append(product["p_id"])
+
+        return jsonify(product_dict), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+    
 @product_bp.route('/remove_product/<product_id>', methods=['DELETE'])
 def remove_product(product_id):
     try:
