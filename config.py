@@ -13,26 +13,14 @@ cloudinary.config(
     api_secret="mSix-JVm0Y0rmxzNbkt3M2K-toE"
 )
 
-AUTH_KEY = 'your_msg91_auth_key'
-SENDER_ID = 'your_sender_id'
-TEMPLATE_ID = 'your_template_id'
-
-def send_otpMSG91(phone):
-    url = "https://control.msg91.com/api/v5/otp"
-
+def verify_widget_token(jwt_token):
+    url = "https://control.msg91.com/api/v5/widget/verifyAccessToken"
     payload = {
-        "template_id": TEMPLATE_ID,
-        "mobile": f"+91{phone}",
-        "authkey": AUTH_KEY
+        "authkey": "444162AojpM5TtIQ7067f64aeeP1",
+        "access-token": jwt_token
     }
-
     response = requests.post(url, json=payload)
-    return jsonify(response.json())
-
-def verify_otpMSG91(phone,otp):
-    url = f"https://control.msg91.com/api/v5/otp/verify?mobile=+91{phone}&otp={otp}&authkey={AUTH_KEY}"
-    response = requests.get(url)
-    return jsonify(response.json())
+    return response.json()
 
 def uploadImg(base64_image):
     try:
@@ -42,8 +30,6 @@ def uploadImg(base64_image):
     except Exception as e:
         print(e)
         return None
-    
-
 
 def load_otps():
     try:

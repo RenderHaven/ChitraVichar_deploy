@@ -327,13 +327,13 @@ def item_from_products():
 
         if not product_ids:
             return jsonify({'error': 'No product IDs provided'}), 400
-        
-        # Initialize with empty lists
+
         grouped_items = {pid: [] for pid in product_ids}
-        # Fetch product items with product IDs
+
+        # Eagerly load variations using joinedload
         product_items = db.session.query(ProductItem, ProToItem.p_id).join(ProToItem).filter(
             ProToItem.p_id.in_(product_ids)
-        ).all()
+        ).options(joinedload(ProductItem.variations)).all()
 
         for item, p_id in product_items:
             grouped_items.setdefault(p_id, []).append(item.to_small_dict())

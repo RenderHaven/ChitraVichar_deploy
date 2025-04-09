@@ -43,6 +43,7 @@ def register():
             return jsonify({'message': 'OTP required.'}), 400
         
         ext_user = User.query.filter_by(number=number).first()
+        
         if ext_user:
             return jsonify({'message': 'User with this number already exists.'}), 400
         
