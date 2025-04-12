@@ -47,8 +47,8 @@ def register():
         if ext_user:
             return jsonify({'message': 'User with this number already exists.'}), 400
         
-        # if not config.verify_otp(number,otp):
-        #     return jsonify({'message': 'WRONG OTP'}), 400
+        if not config.verify_widget_token(number,otp):
+            return jsonify({'message': 'WRONG OTP'}), 400
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         new_user = User(number=number, password=hashed_password, name=name,email=email)
@@ -83,7 +83,7 @@ def login():
         data = request.json
         number = data.get('number')
         password = data.get('password')
-
+        print(data)
         if not number or not password:
             return jsonify({'message': 'Number and password are required.'}), 400
         print(number,password)
@@ -220,7 +220,39 @@ def edit_user(user_id):
         db.session.rollback()
         print(e)
         return jsonify({'message': 'An error occurred while updating user data.', 'error': str(e)}), 500
-    
+
+@user_bp.route('/edit_user_password', methods=['PUT'])
+def edit_user_password():
+    try:
+        data = request.json
+        number = data.get('number')
+        password = data.get('password')
+        newPassword=data.get('newPassword')
+        token=data.get('token')
+        # print(data)
+        if not number or not password or not newPassword:
+            return jsonify({'message': 'Number and password are required.'}), 400
+        # print(number,password)
+        user = User.query.filter_by(number=number).first()
+        # print(user.password)
+        if not user:
+            return jsonify({'message': 'User not found'}), 401
+        
+        print(check_password_hash(user.password, password))
+        if token :
+            if not config.verify_widget_token(number,token):
+                return jsonify({'message': 'WRONG OTP'}), 400
+        elif not token and not check_password_hash(user.password, password):
+            return jsonify({'message': 'Invalid password.'}), 401
+        
+        user.password=generate_password_hash(newPassword, method='pbkdf2:sha256')
+        db.session.commit()
+        return jsonify({'message': 'User Password updated successfully.'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(e)
+        return jsonify({'message': 'An error occurred while updating user data.', 'error': str(e)}), 500
 # @user_bp.route('/get_card_item/<string:user_id>', methods=['GET'])
 # def get_card_item(user_id):
 #     """
