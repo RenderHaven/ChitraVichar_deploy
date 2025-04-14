@@ -98,11 +98,6 @@ def edit_item():
         data = request.json
         item_id = data.get('item_id')
 
-        if(item_id=='Lable'):
-            return jsonify({
-            "message": "Item updated successfully",
-            "item_id": item_id
-            }), 200
         
         item_name = data.get('name')
         price = data.get('price')
