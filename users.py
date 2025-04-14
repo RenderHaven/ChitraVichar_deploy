@@ -47,7 +47,7 @@ def register():
         if ext_user:
             return jsonify({'message': 'User with this number already exists.'}), 400
         
-        if not config.verify_widget_token(number,otp):
+        if not config.verify_widget_token(otp):
             return jsonify({'message': 'WRONG OTP'}), 400
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
@@ -240,7 +240,7 @@ def edit_user_password():
         
         print(check_password_hash(user.password, password))
         if token :
-            if not config.verify_widget_token(number,token):
+            if not config.verify_widget_token(token):
                 return jsonify({'message': 'WRONG OTP'}), 400
         elif not token and not check_password_hash(user.password, password):
             return jsonify({'message': 'Invalid password.'}), 401
