@@ -115,7 +115,8 @@ class ProductItem(db.Model):
                 grouped_data[variation_id]["variation_name"] = item["variation_name"]
                 grouped_data[variation_id]["options"].append({
                     "id": item["id"],
-                    "value": item["value"]
+                    "value": item["value"],
+                    'disc':item['disc']
                 })
 
         # Final result conversion in a separate loop for clarity
@@ -315,11 +316,13 @@ class Order(db.Model):
         return {
             "id": self.o_id,
             'user_name':self.user.name,
+            "user_id": self.user_id,
             "address": self.address,
             "status": self.status,
             "datetime": self.datetime if self.datetime else None,
             "delivery_charge": self.delivery_charge,
             "total_price": self.total_price,
+            'short_note':self.short_note,
             "payINFO":self.payINFO,
         }
     def to_dict(self):
@@ -332,6 +335,7 @@ class Order(db.Model):
             "delivery_charge": self.delivery_charge,
             "total_price": self.total_price,
             "payINFO":self.payINFO,
+            'short_note':self.short_note,
             "items": [item.to_dict() for item in self.order_items] if self.order_items else []
         }
 
