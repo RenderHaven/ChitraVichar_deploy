@@ -1,9 +1,10 @@
 
-from flask import Blueprint
+from flask import Blueprint, request
 from flask import Blueprint,jsonify,g
 from sqlalchemy import func,case,desc
 
 from models import ImgItem,ProductItem,OrderItems,Order,db
+from otp import Email
 
 home_bp = Blueprint('home', __name__)
 @home_bp.route('/get_home', methods=['GET'])
@@ -73,3 +74,27 @@ def get_summary():
     except Exception as e:
         print(e)
         return jsonify({"error": str(e)}), 500
+    
+
+@home_bp.route('/send_email', methods=['POST'])
+def send_email_to_list():
+    try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+        data = request.json
+        emails = data.get('emails')  # List of recipient emails
+        subject = data.get('subject', 'No Subject')  # Optional
+        body = data.get('message', '')  # Email content
+
+        if not emails or not isinstance(emails, list) or not body:
+            return jsonify({'message': 'Invalid request. "emails" (list) and "message" (string) are required.'}), 400
+
+        try:
+            Email.send_email(emails, subject, body)
+            return jsonify({'message': 'Emails sent successfully.'}), 200
+        except Exception as e:
+            return jsonify({'message': f'Failed to send emails: {str(e)}'}), 500
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+    
