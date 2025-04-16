@@ -315,7 +315,6 @@ class Order(db.Model):
     def to_small(self):
         return {
             "id": self.o_id,
-            'user_name':self.user.name,
             "user_id": self.user_id,
             "address": self.address,
             "status": self.status,

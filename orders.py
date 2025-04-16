@@ -18,7 +18,7 @@ def get_orders():
     if not g.is_valid_request:
             return jsonify({"error": "Unauthorized"}), 401
     orders = Order.query.all()
-    return jsonify([order.to_small() for order in orders])
+    return jsonify([order.to_small() for order in orders]),200
 
 @orders_bp.route('/get/<string:order_id>', methods=['GET'])
 def get_order(order_id):
