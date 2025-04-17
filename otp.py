@@ -6,8 +6,8 @@ from email.mime.multipart import MIMEMultipart
 # Replace with your SMTP config
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_USER = "vikrambalai1002@gmail.com"
-SMTP_PASSWORD = "wnna bkyf uqga bock"
+SMTP_USER = "chitravichar.in@gmail.com"
+SMTP_PASSWORD = "evez hupc pmmu rpim"
 
 class Email:
     @staticmethod
