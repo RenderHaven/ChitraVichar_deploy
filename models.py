@@ -321,7 +321,6 @@ class Order(db.Model):
             "datetime": self.datetime if self.datetime else None,
             "delivery_charge": self.delivery_charge,
             "total_price": self.total_price,
-            'short_note':self.short_note,
             "payINFO":self.payINFO,
         }
     def to_dict(self):

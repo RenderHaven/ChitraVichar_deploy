@@ -82,7 +82,7 @@ def send_email_to_list():
         if not g.is_valid_request:
             return jsonify({"error": "Unauthorized"}), 401
         data = request.json
-        emails = data.get('emails')  # List of recipient emails
+        emails = data.get('emails',[])  # List of recipient emails
         subject = data.get('subject', 'No Subject')  # Optional
         body = data.get('message', '')  # Email content
 
