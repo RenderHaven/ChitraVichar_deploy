@@ -134,10 +134,11 @@ def get_variations_by_item(item_id):
                 variation = Variation.query.get(variation_option.variation_id)
                 if variation:
                     # Add to list only if the variation_id is unique
+                    get_name = lambda name: ("", "") if not name else (name.split("::", 1)[0], name.split("::", 1)[1] if "::" in name else name)
                     if variation.id not in variation_ids:
                         variations.append({
                             "variation_id": variation.id,
-                            "variation_name": variation.name,
+                            "variation_name": get_name(variation.name)[0],
                             "option_values": [option.value for option in variation.options],
                             "option_ids": [option.id for option in variation.options]
                         })
@@ -217,6 +218,7 @@ def edit_variation(variation_id):
                 # Update existing option
                 existing_options[option_id].value = option_value
                 existing_options[option_id].disc = option_disc
+                existing_options[option_id].variation_name = new_name
                 received_option_ids.add(option_id)
             else:
                 # Add new option

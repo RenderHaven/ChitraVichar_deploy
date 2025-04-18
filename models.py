@@ -109,14 +109,16 @@ class ProductItem(db.Model):
         for var in self.variations:
             my_options.append(var.variation_option_id)
             if(all):
-                item = var.variation_option.to_dict()
-                variation_id = item["variation_id"]
-
-                grouped_data[variation_id]["variation_name"] = item["variation_name"]
+                item = var.variation_option
+                variation_id =item.variation_id
+                get_name = lambda name: ("", "") if not name else (name.split("::", 1)[0], name.split("::", 1)[1] if "::" in name else name)
+                
+                # Assign the actual name
+                grouped_data[variation_id]["variation_name"] = get_name(item.variation_name)[0]
                 grouped_data[variation_id]["options"].append({
-                    "id": item["id"],
-                    "value": item["value"],
-                    'disc':item['disc']
+                    "id": item.id,
+                    "value": item.value,
+                    'disc':item.disc,
                 })
 
         # Final result conversion in a separate loop for clarity
