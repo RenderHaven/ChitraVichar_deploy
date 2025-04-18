@@ -97,8 +97,6 @@ def edit_item():
             return jsonify({"error": "Unauthorized"}), 401
         data = request.json
         item_id = data.get('item_id')
-
-        
         item_name = data.get('name')
         price = data.get('price')
         discount= data.get('discount')

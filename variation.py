@@ -131,18 +131,19 @@ def get_variations_by_item(item_id):
         for item_variation in item_variations:
             variation_option = VariationOption.query.get(item_variation.variation_option_id)
             if variation_option:
-                variation = Variation.query.get(variation_option.variation_id)
-                if variation:
-                    # Add to list only if the variation_id is unique
+                variation_id = variation_option.variation_id
+                if variation_id not in variation_ids:
                     get_name = lambda name: ("", "") if not name else (name.split("::", 1)[0], name.split("::", 1)[1] if "::" in name else name)
-                    if variation.id not in variation_ids:
-                        variations.append({
-                            "variation_id": variation.id,
-                            "variation_name": get_name(variation.name)[0],
-                            "option_values": [option.value for option in variation.options],
-                            "option_ids": [option.id for option in variation.options]
-                        })
-                        variation_ids.add(variation.id)
+                    variation_name, _ = get_name(variation_option.name)
+                    # Get all options for this variation_id
+                    options = VariationOption.query.filter_by(variation_id=variation_id).all()
+                    variations.append({
+                        "variation_id": variation_id,
+                        "variation_name": variation_name,
+                        "option_values": [opt.value for opt in options],
+                        "option_ids": [opt.id for opt in options]
+                    })
+                    variation_ids.add(variation_id)
 
         return jsonify(variations), 200
 
