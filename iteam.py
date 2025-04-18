@@ -237,6 +237,35 @@ def search_items():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@item_bp.route('/get_all', methods=['GET'])
+def get_all():
+    try:
+        if not g.is_valid_request:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        # Fetch all product items
+        items = ProductItem.query.all()
+
+        # Fetch all item_ids that are linked in ProductToItems
+        linked_item_ids = db.session.query(ProToItem.i_id).distinct().all()
+        linked_item_ids_set = {item_id for (item_id,) in linked_item_ids}
+
+        search_results = []
+        for item in items:
+            item_dict = item.to_search_dict()
+            if item.i_id in linked_item_ids_set:
+                item_dict["has_products"] = True
+            else:
+                item_dict["has_products"] = False
+            search_results.append(item_dict)
+
+        return jsonify(search_results), 200
+
+    except Exception as e:
+        print(e)
+        return jsonify({"error": str(e)}), 500
+
 
 @item_bp.route('/add_items_to_product/<string:product_id>', methods=['POST'])
 def add_items_to_product(product_id):
@@ -259,26 +288,26 @@ def add_items_to_product(product_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-@item_bp.route('/get_items_by_filter', methods=['GET'])
-def get_items():
-    try:
-        product_ids = request.args.getlist('ProductIds')
+# @item_bp.route('/get_items_by_filter', methods=['GET'])
+# def get_items():
+#     try:
+#         product_ids = request.args.getlist('ProductIds')
 
-        query = db.session.query(ProductItem)
+#         query = db.session.query(ProductItem)
 
-        if product_ids and 'all' not in product_ids:
-            query = query.join(ProductItem.products).filter(Product.p_id.in_(product_ids))
+#         if product_ids and 'all' not in product_ids:
+#             query = query.join(ProductItem.products).filter(Product.p_id.in_(product_ids))
 
-        items = query.all()
+#         items = query.all()
 
-        result = []
-        for item in items:
-            result.append(item.to_search_dict())
+#         result = []
+#         for item in items:
+#             result.append(item.to_search_dict())
 
-        return jsonify(result), 200
+#         return jsonify(result), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
 
 @item_bp.route('/upload_item_images', methods=['POST'])
 def upload_item_images():
@@ -303,7 +332,6 @@ def upload_item_images():
         for base64_image in base64_images:
             try:
                 image_url = config.uploadImg(base64_image)
-                # Save image URL to ImgItem table
                 new_img_item = ImgItem(item_id=item_id, image_url=image_url)
                 db.session.add(new_img_item)
                 uploaded_urls.append(new_img_item.to_dict())
